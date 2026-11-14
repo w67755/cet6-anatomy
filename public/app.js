@@ -936,6 +936,71 @@
       "<script>window.__DATA__ = " + json + ";</scr" + "ipt><script>" + pageJs + "</scr" + "ipt></body></html>";
   }
 
+  /* ---------------- 整卷分割 ---------------- */
+  let splitData = [];
+
+  async function doSplit() {
+    const images = state.images.map(function (im) { return { dataUrl: im.dataUrl }; });
+    const article = els.article.value.trim();
+    if (!images.length && !article) return toast("先传试卷照片（或粘贴文字）");
+    if (!images.length) return toast("整卷分割要先传照片");
+    const btn = $("#btnSplit");
+    btn.disabled = true; btn.textContent = "分割中…";
+    try {
+      const r = await api("/api/split", { images: images, article: article });
+      if (r && r.error) throw new Error(r.error);
+      splitData = r.passages || [];
+      renderSplit();
+      $("#ovSplit").classList.add("show");
+    } catch (e) {
+      toast("分割失败：" + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false; btn.textContent = "整卷分割…";
+    }
+  }
+
+  function renderSplit() {
+    const box = $("#splitList");
+    box.innerHTML = splitData.map(function (p, i) {
+      const words = String(p.article || "").split(/\s+/).filter(Boolean).length;
+      return '<label class="rrow" style="cursor:pointer">' +
+        '<input type="checkbox" class="spchk" data-i="' + i + '" checked style="margin-top:4px">' +
+        '<div class="rmain"><b>' + esc(p.title) + "</b>" +
+        "<small>" + words + " 词 · " + (p.questions || []).length + " 题</small>" +
+        '<div class="vzh" style="margin-top:4px">' + esc(String(p.article || "").slice(0, 90)) + "…</div></div></label>";
+    }).join("");
+  }
+
+  async function saveSplit() {
+    const picks = Array.from(document.querySelectorAll(".spchk")).filter(function (c) { return c.checked; })
+      .map(function (c) { return splitData[Number(c.dataset.i)]; });
+    if (!picks.length) return toast("至少选一篇");
+    let ok = 0;
+    for (const p of picks) {
+      try {
+        await api("/api/records", {
+          title: p.title || "整卷分割",
+          article: p.article || "",
+          questions: (p.questions || []).map(function (q, i) {
+            return {
+              no: q.no || i + 1,
+              stem: q.stem || "",
+              options: q.options || {},
+              my: q.my || "",
+              correct: q.answer || "",
+            };
+          }),
+          analysis: "",
+          chat: [],
+        });
+        ok++;
+      } catch (e) { /* 单条失败继续 */ }
+    }
+    $("#ovSplit").classList.remove("show");
+    toast("已存 " + ok + " 篇，去错题本里逐条打开解剖");
+    openHistory();
+  }
+
   /* ---------------- 练习册 ---------------- */
   function qErr(msg) {
     const el = $("#qErr");
@@ -1682,6 +1747,9 @@
     if (!(await confirmBox("删除选中的记录", "将删除 " + ids.length + " 条记录，无法恢复。"))) return;
     await deleteRecords(ids);
   });
+  $("#btnSplit").addEventListener("click", doSplit);
+  $("#splitClose").addEventListener("click", function () { $("#ovSplit").classList.remove("show"); });
+  $("#splitSave").addEventListener("click", saveSplit);
   $("#btnBackup").addEventListener("click", exportBackup);
   $("#fileRestore").addEventListener("change", function (e) {
     const f = e.target.files && e.target.files[0];
@@ -1861,6 +1929,16 @@
     renderVocab();
     if (!/[?&]vocabdemo=seed/.test(location.search)) $("#ovVocab").classList.add("show");
   }
+  if (/[?&]splitdemo=1/.test(location.search)) setTimeout(async function () {
+    try {
+      const r = await api("/api/split", { images: [], article: "demo" });
+      splitData = r.passages || [];
+      renderSplit();
+      $("#ovSplit").classList.add("show");
+    } catch (e) {
+      document.body.insertAdjacentHTML("beforeend", "<pre style='padding:20px;color:#b3352b'>" + e.message + "</pre>");
+    }
+  }, 700);
   if (/[?&]resultdemo=1/.test(location.search)) setTimeout(function () {
     if (!vocabAll().length) seedDemoVocab();
     applyQuizResult({ wrong: ["vehement"], right: ["influencer", "scrutiny"] });

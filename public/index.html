@@ -300,6 +300,7 @@
       <div class="row">
         <label class="btn ghost sm">上传 txt<input type="file" id="file" accept=".txt,.md" hidden></label>
         <button class="btn ghost sm" id="clearArticle">清空文字</button>
+        <button class="btn sm" id="btnSplit">整卷分割…</button>
       </div>
     </div>
 
@@ -448,6 +449,19 @@ D) The influencer industry has grown to about $250 billion by now."></textarea>
     <div class="foot">
       <button class="btn ghost" id="vClear">清空生词本</button>
       <button class="btn ghost" id="closeVocab">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovSplit">
+  <div class="sheet" style="width:min(700px,100%)">
+    <h3>整卷分割</h3>
+    <div class="sub">把这一整套试卷切成一篇篇的文章，存进错题本。之后逐条打开点「开始解剖」就行。</div>
+    <div id="splitList"></div>
+    <div class="cfgerr" id="splitErr"></div>
+    <div class="foot">
+      <button class="btn ghost" id="splitClose">取消</button>
+      <button class="btn primary" id="splitSave">存进错题本</button>
     </div>
   </div>
 </div>

@@ -104,6 +104,18 @@ const QUIZ_SYSTEM = [
   '{"title":"短文标题","passage":"正文，含 **word** 标记","questions":[{"stem":"…","options":{"A":"…","B":"…","C":"…","D":"…"},"answer":"B","why":"…"}]}',
 ].join("\n");
 
+const SPLIT_SYSTEM = [
+  "你是六级试卷的排版分析员。输入是一整套试卷的照片（可能包含多篇阅读）。",
+  "任务：把阅读文章按「篇」切开，逐篇转录。",
+  "要求：",
+  "1. 每篇包含：标题（没有就用 Passage N 或首句前六个词）、完整正文、紧随其后的题目（题干 + A/B/C/D 四个选项）。",
+  "2. 只做切分与转录，不要分析、不要翻译、不要总结。",
+  "3. 图片看不清的地方写 [不清]，不要猜。",
+  "4. 如果只有一篇，数组里就一项。",
+  "5. 只输出 JSON，不要解释、不要代码块围栏：",
+  '{"passages":[{"title":"…","article":"正文，段落之间空一行","questions":[{"no":"21","stem":"…","options":{"A":"…","B":"…","C":"…","D":"…"},"my":"A-D 或空","answer":"A-D 或空"}]}]}',
+].join("\n");
+
 function questionBlock(qs) {
   return (qs || []).map((q, i) => {
     const no = q.no || i + 1;
@@ -427,6 +439,73 @@ const server = http.createServer(async (req, res) => {
       { role: "user", content: userContent },
     ];
     return streamUpstream(res, messages, cfg);
+  }
+
+  if (u.pathname === "/api/split" && req.method === "POST") {
+    const b = await body(req);
+    const cfg = getSettings();
+    const reply = (obj, code) => {
+      res.writeHead(code || 200, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify(obj));
+    };
+    const images = (Array.isArray(b.images) ? b.images : [])
+      .filter((x) => x && typeof x.dataUrl === "string" && x.dataUrl.indexOf("data:image/") === 0)
+      .slice(0, 6);
+    const text = String(b.article || "").trim();
+    if (!images.length && !text) return reply({ error: "没有收到试卷照片" }, 400);
+    if (!cfg.apiKey) return reply({ error: "整卷分割需要 API Key（要先让模型读图）" }, 400);
+    if (images.length && !/flash/i.test(String(cfg.model))) return reply({ error: "当前模型不支持读图，请改用 deepseek-flash" }, 400);
+
+    const parts = [];
+    if (text) parts.push("【学生粘贴的文字】\n" + text);
+    parts.push("请把上面的内容按篇切分并转录，输出 JSON。");
+
+    const userContent = images.length
+      ? [{ type: "text", text: parts.join("\n\n") }].concat(images.map((im) => ({ type: "image_url", image_url: { url: im.dataUrl } })))
+      : parts.join("\n\n");
+
+    const base = String(cfg.baseUrl || "").replace(/\/+$/, "");
+    try {
+      const r = await fetch(base + "/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.apiKey },
+        body: JSON.stringify({
+          model: cfg.model || "deepseek-flash",
+          messages: [
+            { role: "system", content: SPLIT_SYSTEM },
+            { role: "user", content: userContent },
+          ],
+          thinking: { type: "disabled" },
+          response_format: { type: "json_object" },
+          temperature: 0.2,
+          max_tokens: 6000,
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        return reply({ error: "上游返回 " + r.status + "：" + t.slice(0, 220) }, 502);
+      }
+      const j = await r.json();
+      const raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || "";
+      const cleaned = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+      let data = null;
+      try { data = JSON.parse(cleaned); } catch {
+        const m = cleaned.match(/\{[\s\S]*\}/);
+        if (m) { try { data = JSON.parse(m[0]); } catch {} }
+      }
+      if (!data) return reply({ error: "解析失败：" + cleaned.slice(0, 120) }, 502);
+      const list = (Array.isArray(data.passages) ? data.passages : []).slice(0, 8).map((p) => ({
+        title: String(p.title || "未命名").slice(0, 60),
+        article: String(p.article || ""),
+        questions: Array.isArray(p.questions) ? p.questions : [],
+      })).filter((p) => p.article || p.questions.length);
+      if (!list.length) return reply({ error: "没识别出任何文章" }, 502);
+      return reply({ passages: list });
+    } catch (e) {
+      return reply({ error: "分割失败：" + String((e && e.message) || e) }, 502);
+    }
   }
 
   if (u.pathname === "/api/quiz" && req.method === "POST") {
