@@ -121,6 +121,19 @@
     renderThumbs();
   }
 
+  function mixedCheck() {
+    const banner = $("#mixedWarn");
+    if (!banner) return;
+    const hasText = els.article.value.trim().length > 0;
+    const hasQs = collect().length > 0;
+    if (!state.images.length || (!hasText && !hasQs)) { banner.hidden = true; return; }
+    const src = state.recordTitle ? "记录「" + state.recordTitle + "」" : "文字输入";
+    $("#mixedTitle").textContent =
+      "已经有" + src + "的内容。照片会和这些文字、题目一起发出去，模型可能对不上号——" +
+      "要做的是新的一篇，先清空。";
+    banner.hidden = false;
+  }
+
   function clearImages() {
     const had = state.images.length > 0;
     state.images = [];
@@ -1716,6 +1729,7 @@
       els.article.value = rec.article || "";
       updateWc();
       if (clearImages()) toast("已清空上一批照片：这条记录用转录的文字解剖，不会再读图");
+      mixedCheck();
       const recKind = (rec.questions || []).some(function (q) { return q && q.type === "match"; }) ? "match" : "mcq";
       state.kind = recKind;
       const ksel = $("#qkind"); if (ksel) ksel.value = recKind;
@@ -1805,6 +1819,20 @@
     } else addQuestion();
   });
   $("#analyze").addEventListener("click", analyze);
+  $("#mixedClear").addEventListener("click", function () {
+    els.article.value = "";
+    updateWc();
+    els.qlist.innerHTML = ""; qSeq = 0; addQuestion();
+    clearImages();
+    state.recordId = null; state.recordTitle = "";
+    updateRecChip("");
+    $("#mixedWarn").hidden = true;
+    toast("已清空文字与题目，这次按照片新建一条记录");
+  });
+  $("#mixedKeep").addEventListener("click", function () {
+    $("#mixedWarn").hidden = true;
+  });
+
   $("#recDetach").addEventListener("click", function () {
     state.recordId = null;
     state.recordTitle = "";
@@ -2018,6 +2046,12 @@
     renderVocab();
     if (!/[?&]vocabdemo=seed/.test(location.search)) $("#ovVocab").classList.add("show");
   }
+  if (/[?&]afterimg=1/.test(location.search)) setTimeout(function () {
+    const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    state.images = [{ name: "new-page.jpg", dataUrl: png, w: 1, h: 1, kb: 1 }];
+    renderThumbs();
+    mixedCheck();
+  }, 1300);
   if (/[?&]imgdemo=1/.test(location.search)) setTimeout(function () {
     const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
     state.images = [{ name: "demo1.jpg", dataUrl: png, w: 1, h: 1, kb: 1 }, { name: "demo2.jpg", dataUrl: png, w: 1, h: 1, kb: 1 }];

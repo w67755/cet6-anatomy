@@ -135,6 +135,8 @@
   .runcard{position:sticky;bottom:12px;background:linear-gradient(#fff,#fffdf8)}
   .recchip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#8a6100;background:#fff7e3;border:1px solid #f0dda6;border-radius:9px;padding:6px 10px;margin-bottom:10px}
   .recchip b{color:#6b4c00}
+  .mixed{background:#fff4e5;border:1px solid #f0d9b5;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12.5px;line-height:1.6;color:#7a5300}
+  .mixed .mtitle{font-weight:600}
   .lnk{border:none;background:none;color:#1c4f82;text-decoration:underline;cursor:pointer;font-size:12px;padding:0}
   /* ---------- result / markdown ---------- */
   #resultCard{max-height:none}
@@ -332,6 +334,13 @@
       <div class="recchip" id="recChip" style="display:none">
         <span id="recChipText"></span>
         <button class="lnk" id="recDetach">另存为新记录</button>
+      </div>
+      <div class="mixed" id="mixedWarn" hidden>
+        <div class="mtitle" id="mixedTitle"></div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn sm" id="mixedClear">清空文字，按照片重新开始</button>
+          <button class="btn ghost sm" id="mixedKeep">保持现状</button>
+        </div>
       </div>
       <button class="btn primary big" id="analyze">开始解剖</button>
       <div class="hint" id="runhint" style="margin-top:8px;text-align:center">
