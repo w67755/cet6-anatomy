@@ -1,0 +1,14 @@
+# 个人数据：API Key 和错题记录，绝不提交
+data/
+*.log
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+node_modules/
+
+# 导出的临时文件
+*.docx
+*.pdf

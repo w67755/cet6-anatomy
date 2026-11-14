@@ -1,0 +1,28 @@
+name: ci
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: |
+          node --check server.mjs
+          node --check public/app.js
+      - name: Smoke test
+        run: |
+          NO_OPEN=1 PORT=7788 node server.mjs &
+          for i in $(seq 1 20); do
+            sleep 0.5
+            if curl -fsS http://127.0.0.1:7788/api/health; then exit 0; fi
+          done
+          echo "server did not start" >&2
+          exit 1

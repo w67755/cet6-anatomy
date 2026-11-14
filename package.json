@@ -1,0 +1,18 @@
+{
+  "name": "cet6-anatomy",
+  "version": "0.3.0",
+  "private": true,
+  "description": "六级阅读错题解剖台：上传试卷照片，逐句定位、选项溯源、点词查义、生词本导出 Word/PDF",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "license": "UNLICENSED"
+}

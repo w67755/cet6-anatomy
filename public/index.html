@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>错题解剖台 · 六级阅读</title>
+<style>
+  :root{
+    --paper:#f4f2ed; --surface:#fff; --ink:#22252a; --muted:#6b7280;
+    --line:#e6e2d9; --accent:#1c4f82; --accent-soft:#e8f0f8; --red:#b3352b; --green:#1c7a4a;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;
+    font-size:14.5px;line-height:1.7;
+  }
+  button{font-family:inherit}
+  /* ---------- header ---------- */
+  header{
+    position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+    gap:12px;padding:10px 20px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;align-items:center;gap:10px}
+  .logo{
+    width:34px;height:34px;border-radius:9px;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px;
+  }
+  .brand b{display:block;font-size:15.5px;letter-spacing:.5px}
+  .brand small{display:block;color:var(--muted);font-size:11.5px;letter-spacing:.08em}
+  .tools{display:flex;gap:8px;align-items:center}
+  /* ---------- buttons ---------- */
+  .btn{
+    border:1px solid var(--line);background:var(--surface);color:var(--ink);
+    padding:7px 13px;border-radius:9px;cursor:pointer;font-size:13.5px;
+    transition:.15s;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;
+  }
+  .btn:hover{border-color:#cfc9bb;background:#faf8f4}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{background:#16406b}
+  .btn.primary:disabled{opacity:.55;cursor:default}
+  .btn.ghost{background:transparent}
+  .btn.sm{padding:5px 10px;font-size:12.5px}
+  .btn.big{width:100%;justify-content:center;padding:12px;font-size:15px;letter-spacing:.08em}
+  .dot{width:7px;height:7px;border-radius:50%;background:#c9c4b8;display:inline-block}
+  .dot.on{background:#33b36b;box-shadow:0 0 0 3px rgba(51,179,107,.18)}
+  .banner{
+    background:#fdecea;color:#8a2018;border-bottom:1px solid #f3d3cf;
+    padding:9px 18px;font-size:13px;text-align:center;line-height:1.6
+  }
+  .banner b{font-weight:700}
+  .cfgerr{display:none;font-size:12.5px;line-height:1.6;padding:9px 11px;border-radius:9px;margin-bottom:10px;background:#fdf2f1;border:1px solid #f3d3cf;color:#8a2018}
+  .cfgerr.show{display:block}
+  .cfgerr.ok{background:#eef7f1;border-color:#cfe8da;color:#1c7a4a}
+  .banner a{color:#8a2018;text-decoration:underline}
+  /* ---------- layout ---------- */
+  main{
+    display:grid;grid-template-columns:minmax(340px,430px) minmax(0,1fr);gap:16px;
+    padding:16px;max-width:1500px;margin:0 auto;align-items:start;
+  }
+  .col{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .cardhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .cardhead h2{margin:0;font-size:14.5px;letter-spacing:.03em}
+  .hint{color:var(--muted);font-size:12px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .row.tight{margin:0}
+  /* ---------- inputs ---------- */
+  textarea,input[type=text],input[type=password],select{
+    width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;
+    font-family:inherit;font-size:13.5px;color:var(--ink);background:#fff;outline:none;
+  }
+  textarea:focus,input:focus,select:focus{border-color:#b9c8d8;box-shadow:0 0 0 3px rgba(28,79,130,.08)}
+  #article{
+    min-height:230px;resize:vertical;font-family:Georgia,"Times New Roman",serif;
+    font-size:14.5px;line-height:1.75;background:#fdfcf9;
+  }
+  /* ---------- image drop ---------- */
+  .drop{
+    border:2px dashed #d6cfc0;border-radius:12px;padding:18px 14px;text-align:center;
+    background:#fdfcf8;cursor:pointer;transition:.15s;line-height:1.6
+  }
+  .drop:hover,.drop.over{border-color:var(--accent);background:#f2f7fc}
+  .drop .big{font-size:26px;line-height:1;margin-bottom:6px}
+  .drop b{color:var(--accent)}
+  .drop .hint{margin-top:4px}
+  .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .thumb{position:relative;width:78px;height:78px;border-radius:9px;overflow:hidden;border:1px solid var(--line);background:#fff}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb button{
+    position:absolute;top:2px;right:2px;width:19px;height:19px;border-radius:50%;border:none;
+    background:rgba(20,22,26,.62);color:#fff;font-size:12px;line-height:1;cursor:pointer;padding:0
+  }
+  .or{display:flex;align-items:center;gap:10px;color:#b0a99b;font-size:12px;margin:14px 0 8px}
+  .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+  .myrow{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .myrow label{font-size:12.5px;color:var(--muted);white-space:nowrap}
+  .myrow input{font-size:13px}
+
+  /* ---------- question cards ---------- */
+  .q{border:1px dashed #ddd7ca;border-radius:11px;padding:10px 12px;margin-bottom:10px;background:#fbfaf6}
+  .qhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .qhead .no{
+    flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;
+  }
+  .qhead input{flex:1;font-family:Georgia,"Times New Roman",serif;font-size:14px}
+  .del{border:none;background:none;color:#b9b3a6;cursor:pointer;font-size:17px;line-height:1;padding:2px 4px}
+  .del:hover{color:var(--red)}
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .opt{display:flex;align-items:center;gap:6px}
+  .opt i{
+    font-style:normal;flex:0 0 18px;text-align:center;font-size:12px;color:var(--muted);font-weight:700;
+  }
+  .opt input{font-family:Georgia,"Times New Roman",serif;font-size:13.5px}
+  .ansrow{display:flex;align-items:center;gap:6px;margin-top:9px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+  .ansrow select{width:auto;min-width:76px;padding:4px 6px}
+  .ansrow .pill{
+    padding:2px 8px;border-radius:20px;border:1px solid var(--line);background:#fff;cursor:pointer;
+    font-size:12px;color:var(--muted)
+  }
+  .ansrow .pill.sel{background:#fdecea;border-color:#f3cfcb;color:var(--red);font-weight:700}
+  .runcard{position:sticky;bottom:12px;background:linear-gradient(#fff,#fffdf8)}
+  /* ---------- result / markdown ---------- */
+  #resultCard{max-height:none}
+  .md{font-size:14px}
+  .md .empty{color:var(--muted);padding:26px 8px;text-align:center;line-height:2}
+  .md h1,.md h2,.md h3,.md h4{margin:22px 0 10px;line-height:1.4}
+  .md h1{font-size:19px}
+  .md h2{
+    font-size:16.5px;padding-left:10px;border-left:4px solid var(--accent);
+  }
+  .md h3{font-size:14.8px;color:var(--accent)}
+  .md p{margin:9px 0}
+  .md ul,.md ol{margin:8px 0;padding-left:22px}
+  .md li{margin:4px 0}
+  .md blockquote{
+    margin:10px 0;padding:9px 14px;border-left:3px solid #c8d6e5;background:#f7fafd;border-radius:0 8px 8px 0;
+    font-family:Georgia,"Times New Roman",serif;color:#2c3e50;
+  }
+  .md code{background:#f1efe9;padding:1px 5px;border-radius:4px;font-size:12.5px}
+  .md pre{background:#f7f5ef;border:1px solid var(--line);border-radius:9px;padding:11px;overflow:auto}
+  .md pre code{background:none;padding:0}
+  .md table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+  .md th,.md td{border:1px solid var(--line);padding:7px 9px;vertical-align:top;text-align:left}
+  .md th{background:#f3f1ea;font-size:12px;color:#4b5563}
+  .md hr{border:none;border-top:1px solid var(--line);margin:18px 0}
+  .md strong{color:#17222e}
+  .md mark{background:#fff3bf;padding:0 2px;border-radius:3px}
+  /* ---------- reading / dictionary ---------- */
+  .readp{font-family:Georgia,"Times New Roman",serif;font-size:15.5px;line-height:1.95;margin:0 0 13px;color:#22252a;max-width:78ch}
+  .readp .w{cursor:pointer;border-radius:3px;padding:0 1px;transition:background .12s}
+  .readp .w:hover{background:#fff3bf}
+  .readp .w.loading{background:#dbeafe}
+  .dict{
+    position:fixed;z-index:80;width:340px;max-width:88vw;background:#fff;border:1px solid #e2ded4;
+    border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.18);padding:14px 16px 13px;font-size:13.5px;line-height:1.65;
+  }
+  .dict .dw{font-family:Georgia,"Times New Roman",serif;font-size:18px;font-weight:600;padding-right:24px}
+  .dict .ipa{color:#6b7280;font-size:12.5px;font-weight:400;margin-left:7px}
+  .dict .pos{color:#1c4f82;font-size:11.5px;background:#e8f0f8;border-radius:4px;padding:1px 6px;margin-left:7px;vertical-align:2px}
+  .dict .dm{margin-top:9px;font-size:14.5px;font-weight:600;color:#1c4f82}
+  .dict .ds-en{font-family:Georgia,"Times New Roman",serif;font-style:italic;color:#5b6470;font-size:12.5px;line-height:1.55;padding-right:20px;margin-bottom:6px}
+  .dict .dn{margin-top:4px;color:#6b7280;font-size:12.5px}
+  .dict .ds{margin-top:10px;padding-top:9px;border-top:1px dashed #e6e2d9;color:#3d4450;font-size:12.8px}
+  .dict .ds .en{font-family:Georgia,serif;font-style:italic;color:#5b6470;display:block;margin-bottom:4px}
+  .dict .close{position:absolute;top:6px;right:8px;border:none;background:none;color:#b9b3a6;font-size:17px;cursor:pointer;line-height:1;padding:4px}
+  .dict .close:hover{color:#b3352b}
+  .dict .err{color:#b3352b}
+  .dict .tip{color:#9ca3af;font-size:12px;margin-top:6px}
+
+  /* ---------- vocabulary ---------- */
+  .cnt{background:#e8f0f8;color:#1c4f82;border-radius:9px;padding:0 6px;font-size:11.5px;margin-left:2px}
+  .vrow{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff}
+  .vrow:hover{border-color:#d3dbe4}
+  .vrow input[type=checkbox]{margin-top:4px;width:16px;height:16px;accent-color:#1c4f82;cursor:pointer}
+  .vmain{flex:1;min-width:0}
+  .vword{font-family:Georgia,serif;font-size:16px;font-weight:600}
+  .vipa{color:#8b95a1;font-size:12px;margin-left:6px;font-family:Georgia,serif}
+  .vpos{color:#1c4f82;font-size:11px;background:#e8f0f8;border-radius:4px;padding:1px 5px;margin-left:6px}
+  .vmean{font-size:13.5px;margin-top:2px}
+  .vnu{color:#8b95a1;font-size:12px;margin-top:2px}
+  .vex{color:#8b95a1;font-size:12px;margin-top:4px;font-family:Georgia,serif;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .vdel{border:none;background:none;color:#c3bcae;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1}
+  .vdel:hover{color:var(--red)}
+  .vtools{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 14px}
+  .vempty{color:var(--muted);padding:26px 0;text-align:center;font-size:13px}
+
+  /* ---------- chat ---------- */
+  .msgs{display:flex;flex-direction:column;gap:10px;max-height:46vh;overflow:auto;padding-right:4px}
+  .msg{border-radius:11px;padding:9px 12px;font-size:13.8px;max-width:96%}
+  .msg.user{align-self:flex-end;background:var(--accent-soft);border:1px solid #cfe0ef}
+  .msg.bot{align-self:flex-start;background:#fbfaf6;border:1px solid var(--line)}
+  .msg.bot .md{font-size:13.8px}
+  .msg.bot .md h2{font-size:14.6px}
+  .msg.bot .md h3{font-size:13.8px}
+  .askrow{display:flex;gap:8px;margin-top:12px;align-items:flex-end}
+  .askrow textarea{min-height:38px;max-height:120px;resize:none;font-size:13.5px}
+  .askrow .btn{padding:9px 16px}
+  /* ---------- overlays ---------- */
+  .overlay{
+    position:fixed;inset:0;background:rgba(30,32,36,.42);display:none;
+    align-items:center;justify-content:center;padding:20px;z-index:50;
+  }
+  .overlay.show{display:flex}
+  .sheet{
+    background:#fff;border-radius:16px;width:min(620px,100%);max-height:86vh;overflow:auto;
+    padding:22px 24px;box-shadow:0 20px 50px rgba(0,0,0,.22)
+  }
+  .sheet h3{margin:0 0 4px;font-size:17px}
+  .sheet .sub{color:var(--muted);font-size:12.5px;margin-bottom:16px}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px}
+  .field .tip{font-size:11.5px;color:#9ca3af;margin-top:4px}
+  .sheet .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+  .rec{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+  .rec:hover{border-color:#c9d3de;background:#fafbfc}
+  .rec b{font-size:13.5px}
+  .rec small{color:var(--muted);font-size:11.5px;display:block}
+  #toast{
+    position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+    background:#22252a;color:#fff;padding:9px 16px;border-radius:20px;font-size:13px;transition:.25s;z-index:99;
+  }
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  @media (max-width:980px){
+    main{grid-template-columns:1fr}
+    .runcard{position:static}
+  }
+</style>
+</head>
+<body>
+<div id="envWarn" class="banner" hidden></div>
+<header>
+  <div class="brand">
+    <div class="logo">剖</div>
+    <div><b>错题解剖台</b><small>六级阅读 · 逐句定位 · 选项溯源</small></div>
+  </div>
+  <div class="tools">
+    <button class="btn ghost sm" id="btnDemo">填入示例</button>
+    <button class="btn ghost sm" id="btnVocab">生词本 <span id="vocabN" class="cnt">0</span></button>
+    <button class="btn ghost sm" id="btnHistory">错题本</button>
+    <button class="btn ghost sm" id="btnSettings">设置<span class="dot" id="dot" style="margin-left:2px"></span></button>
+  </div>
+</header>
+
+<main>
+  <section class="col left">
+    <div class="card">
+      <div class="cardhead"><h2>① 照片 / 原文</h2><span class="hint" id="wc">0 词</span></div>
+      <div class="drop" id="drop">
+        <div class="big">📷</div>
+        <div>把拍好的页面<b>拖进来</b>，或 <b>点这里选图片</b></div>
+        <div class="hint">JPG / PNG / WebP，可一次传多张（文章页 + 题目页）；也支持直接 Ctrl+V 粘贴截图</div>
+        <input type="file" id="imgInput" accept="image/*" multiple hidden>
+      </div>
+      <div class="thumbs" id="thumbs"></div>
+      <div class="or">没有照片？直接贴文字也行</div>
+      <textarea id="article" spellcheck="false" placeholder="把阅读原文粘贴到这里（也可上传 .txt）。段落之间留空行，定位会更准。"></textarea>
+      <div class="row">
+        <label class="btn ghost sm">上传 txt<input type="file" id="file" accept=".txt,.md" hidden></label>
+        <button class="btn ghost sm" id="clearArticle">清空文字</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="cardhead"><h2>② 题目与我的答案</h2><span class="hint">只填做错的也可以</span></div>
+      <div class="myrow">
+        <label>我那几题选的</label>
+        <input id="myAns" type="text" placeholder="例如：21 B，22 A，23 D　（传图片时填这一行就够了）">
+      </div>
+      <div id="qlist"></div>
+      <div class="row">
+        <button class="btn sm" id="addQ">+ 添加一题</button>
+        <button class="btn ghost sm" id="bulkQ">批量粘贴</button>
+      </div>
+    </div>
+
+    <div class="card runcard">
+      <button class="btn primary big" id="analyze">开始解剖</button>
+      <div class="hint" id="runhint" style="margin-top:8px;text-align:center">
+        会逐段定位、逐项溯源，把你的错选追到“原句”。
+      </div>
+    </div>
+  </section>
+
+  <section class="col right">
+    <div class="card" id="resultCard">
+      <div class="cardhead">
+        <h2>③ 解剖报告</h2>
+        <div class="row tight">
+          <button class="btn ghost sm" id="toRead" style="display:none">原文精读 ↓</button>
+          <button class="btn ghost sm" id="copyMd">复制</button>
+          <button class="btn ghost sm" id="saveMd">导出 .md</button>
+        </div>
+      </div>
+      <div id="result" class="md"><div class="empty">把文章和题目填好，点左边「开始解剖」。<br>报告会包含：文章骨架 → 逐题定位 → 你的错选出自哪一句 → 共性诊断 → 生词。</div></div>
+    </div>
+
+    <div class="card" id="readCard" style="display:none">
+      <div class="cardhead">
+        <h2>⑤ 原文精读</h2>
+        <span class="hint">点任意单词 → 释义 + 整句翻译</span>
+      </div>
+      <div id="reading"></div>
+    </div>
+
+    <div class="card chat">
+      <div class="cardhead"><h2>④ 继续追问</h2><span class="hint">带着原文上下文，问什么都行</span></div>
+      <div id="msgs" class="msgs"></div>
+      <div class="askrow">
+        <textarea id="ask" rows="1" placeholder="例如：22 题的 B 为什么比 D 更像答案？/ 把第 23 题的定位句再拆一下语法"></textarea>
+        <button class="btn primary" id="send">发送</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="overlay" id="ovSettings">
+  <div class="sheet">
+    <h3>设置</h3>
+    <div class="sub">填一次就存在本地 data/settings.json，以后不用再填。推荐 DeepSeek：便宜、中文讲解好。</div>
+    <div class="field">
+      <label>① API 地址</label>
+      <input type="text" id="cfgBase" placeholder="https://api.deepseek.com/v1" autocomplete="off" spellcheck="false">
+      <div class="tip">DeepSeek 就填 <b>https://api.deepseek.com/v1</b>，不要改。<b>官网/申请页的网址不能填在这里。</b></div>
+    </div>
+    <div class="field">
+      <label>② API Key（<b>sk-</b> 开头的那一串）</label>
+      <input type="password" id="cfgKey" placeholder="sk-..." autocomplete="new-password" spellcheck="false">
+      <div class="tip" id="keyTip">在 <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">platform.deepseek.com/api_keys</a> 点「创建 API key」复制过来。只保存在本机。</div>
+    </div>
+    <div class="field">
+      <label>③ 模型</label>
+      <input type="text" id="cfgModel" placeholder="deepseek-flash" list="modelList" autocomplete="off" spellcheck="false">
+      <div class="tip"><b>deepseek-flash</b> ＝ DeepSeek‑V4.1 Flash（便宜、快、还能看图）；<b>deepseek-v4-pro</b> 更强但贵好几倍。<b>别写 “V4.1 Flash” 这种版本号，API 只认这两个名字。</b></div>
+    </div>
+    <datalist id="modelList"><option value="deepseek-flash"></option><option value="deepseek-v4-pro"></option></datalist>
+    <div class="field">
+      <label>温度（0 最稳，0.3 略活泼）</label>
+      <input type="text" id="cfgTemp" placeholder="0.2">
+    </div>
+    <div id="cfgErr" class="cfgerr"></div>
+    <div class="foot">
+      <button class="btn ghost" id="testConn">测试连接</button>
+      <button class="btn ghost" id="cancelSettings">取消</button>
+      <button class="btn primary" id="saveSettings">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovHistory">
+  <div class="sheet">
+    <h3>错题本</h3>
+    <div class="sub">每次解剖会自动存一份，点开可以重新载入当时的文章、题目和报告。</div>
+    <div id="recList"></div>
+    <div class="foot"><button class="btn ghost" id="closeHistory">关闭</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="ovBulk">
+  <div class="sheet">
+    <h3>批量粘贴题目</h3>
+    <div class="sub">把题目原文整段贴进来，能自动拆出题干和 A–D 选项。答案可以稍后手选。</div>
+    <textarea id="bulkText" style="min-height:240px;font-family:Georgia,serif" placeholder="21. What can be inferred from Goldman Sachs's prediction?
+A) The most popular accounts on social media are often owned by women.
+B) Influencers usually have a good number of followers which can be as high as millions.
+C) The number of world-recognized influencers is expected to reach 50 million this year.
+D) The influencer industry has grown to about $250 billion by now."></textarea>
+    <div class="foot">
+      <button class="btn ghost" id="cancelBulk">取消</button>
+      <button class="btn primary" id="doBulk">解析并添加</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovVocab">
+  <div class="sheet" style="width:min(760px,100%)">
+    <h3>生词本</h3>
+    <div class="sub">查过的词会自动收进来。勾选要保留的，删掉已经会的，再导出成 PDF / Word 复习。</div>
+    <div class="vtools">
+      <button class="btn ghost sm" id="vAll">全选</button>
+      <button class="btn ghost sm" id="vNone">全不选</button>
+      <button class="btn ghost sm" id="vDelSel">删除选中</button>
+      <span style="flex:1"></span>
+      <button class="btn sm" id="vPdf">导出 PDF</button>
+      <button class="btn primary sm" id="vWord">导出 Word</button>
+    </div>
+    <div id="vList"></div>
+    <div class="foot">
+      <button class="btn ghost" id="vClear">清空生词本</button>
+      <button class="btn ghost" id="closeVocab">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovConfirm">
+  <div class="sheet" style="width:min(420px,100%)">
+    <h3 id="cfTitle">确认</h3>
+    <div class="sub" id="cfText">确定吗？</div>
+    <div class="foot">
+      <button class="btn ghost" id="cfNo">取消</button>
+      <button class="btn primary" id="cfYes">确定</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
