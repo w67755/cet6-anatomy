@@ -97,12 +97,15 @@ main      ← 能跑的稳定版，随时可启动
     └ feature/xxx  ← 单个功能，一个 PR 只做一件事
 ```
 
-提交前自检（CI 也会跑）：
+提交前自检（和 CI 跑的是同一条命令）：
 
-```bash
-node --check server.mjs
-node --check public/app.js
-```
+| 系统 | 怎么做 |
+|---|---|
+| Windows | 双击 `check.bat` |
+| macOS / Linux | `./check.sh` |
+| Node 已在 PATH 里 | `npm run check` |
+
+它只是 `node --check`：把两个 js 解析一遍，不执行、不联网。语法有问题会直接指到行号，没问题什么都不打印。
 
 ## 隐私
 

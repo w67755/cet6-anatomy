@@ -5,7 +5,8 @@
   "description": "六级阅读错题解剖台：上传试卷照片，逐句定位、选项溯源、点词查义、生词本导出 Word/PDF",
   "type": "module",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node --check public/app.js"
   },
   "engines": {
     "node": ">=18"
