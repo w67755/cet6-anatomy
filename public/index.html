@@ -131,6 +131,9 @@
   }
   .ansrow .pill.sel{background:#fdecea;border-color:#f3cfcb;color:var(--red);font-weight:700}
   .runcard{position:sticky;bottom:12px;background:linear-gradient(#fff,#fffdf8)}
+  .recchip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#8a6100;background:#fff7e3;border:1px solid #f0dda6;border-radius:9px;padding:6px 10px;margin-bottom:10px}
+  .recchip b{color:#6b4c00}
+  .lnk{border:none;background:none;color:#1c4f82;text-decoration:underline;cursor:pointer;font-size:12px;padding:0}
   /* ---------- result / markdown ---------- */
   #resultCard{max-height:none}
   .md{font-size:14px}
@@ -321,6 +324,10 @@
     </div>
 
     <div class="card runcard">
+      <div class="recchip" id="recChip" style="display:none">
+        <span id="recChipText"></span>
+        <button class="lnk" id="recDetach">另存为新记录</button>
+      </div>
       <button class="btn primary big" id="analyze">开始解剖</button>
       <div class="hint" id="runhint" style="margin-top:8px;text-align:center">
         会逐段定位、逐项溯源，把你的错选追到“原句”。

@@ -7,7 +7,7 @@
     msgs: $("#msgs"), ask: $("#ask"), dot: $("#dot"), runhint: $("#runhint"),
   };
 
-  const state = { questions: [], analysis: "", chat: [], recordId: null, busy: false, images: [], reading: [] };
+  const state = { questions: [], analysis: "", chat: [], recordId: null, recordTitle: "", busy: false, images: [], reading: [] };
   const cfg = { baseUrl: "", model: "", hasKey: false };
 
   /* ---------------- utils ---------------- */
@@ -1192,9 +1192,10 @@
     const article = els.article.value.trim() || extractReading(state.analysis) || "";
     const questions = collect();
     if (!article && !questions.length) return;
+    const keepTitle = state.recordId && state.recordTitle;
     const payload = {
       id: state.recordId,
-      title: makeTitle(article, questions),
+      title: keepTitle || makeTitle(article, questions),
       article: article,
       questions: questions,
       analysis: state.analysis,
@@ -1204,6 +1205,7 @@
     try {
       const r = await api("/api/records", payload);
       if (r && r.id) state.recordId = r.id;
+      updateRecChip(payload.title);
     } catch (e) { /* 保存失败不影响主流程 */ }
   }
 
@@ -1250,6 +1252,14 @@
   }
 
   /* ---------------- analyze ---------------- */
+  function updateRecChip(title) {
+    const chip = $("#recChip");
+    if (!chip) return;
+    if (!state.recordId) { chip.style.display = "none"; return; }
+    $("#recChipText").innerHTML = "正在更新记录：<b>" + esc(title || "未命名") + "</b>";
+    chip.style.display = "flex";
+  }
+
   function setBusy(b, txt) {
     state.busy = b;
     $("#analyze").disabled = b;
@@ -1264,7 +1274,7 @@
     const images = state.images.map(function (im) { return { dataUrl: im.dataUrl, name: im.name }; });
     if (!images.length && article.length < 40) return toast("先传一张页面照片，或把文章粘进来");
     if (!images.length && !questions.length) return toast("至少填一道题，或者直接传图片");
-    state.analysis = ""; state.chat = []; state.recordId = null;
+    state.analysis = ""; state.chat = [];
     els.msgs.innerHTML = "";
     $("#result").innerHTML = '<p class="hint">正在定位…</p>';
     setBusy(true, images.length ? "正在读图、定位，通常要 30–90 秒…" : "正在逐段比对，请稍候…");
@@ -1657,6 +1667,8 @@
       (rec.questions || []).forEach(addQuestion);
       if (!els.qlist.children.length) addQuestion();
       state.recordId = rec.id;
+      state.recordTitle = rec.title || "";
+      updateRecChip(rec.title);
       state.analysis = rec.analysis || "";
       state.chat = rec.chat || [];
       $("#result").innerHTML = state.analysis ? md(state.analysis) : '<div class="empty">这份记录还没有报告。</div>';
@@ -1722,6 +1734,12 @@
   });
   $("#addQ").addEventListener("click", function () { addQuestion(); });
   $("#analyze").addEventListener("click", analyze);
+  $("#recDetach").addEventListener("click", function () {
+    state.recordId = null;
+    state.recordTitle = "";
+    updateRecChip("");
+    toast("已断开：下次解剖会新建一条记录");
+  });
   $("#saveRec").addEventListener("click", saveToNotebook);
   $("#send").addEventListener("click", send);
   els.ask.addEventListener("keydown", function (e) {
@@ -1929,6 +1947,12 @@
     renderVocab();
     if (!/[?&]vocabdemo=seed/.test(location.search)) $("#ovVocab").classList.add("show");
   }
+  if (/[?&]loaddemo=1/.test(location.search)) setTimeout(async function () {
+    try {
+      const list = await api("/api/records");
+      if (list && list.length) await loadRecord(list[0].id);
+    } catch (e) { toast("载入失败：" + e.message); }
+  }, 700);
   if (/[?&]splitdemo=1/.test(location.search)) setTimeout(async function () {
     try {
       const r = await api("/api/split", { images: [], article: "demo" });
