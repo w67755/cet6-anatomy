@@ -349,7 +349,7 @@
     } catch (e) { /* 缓存失败不影响使用 */ }
   }
 
-  async function openDict(wordEl, sentence) {
+  async function openDict(wordEl, sentence, src) {
     const word = wordEl.textContent;
     const el = dictShell(word);
     placeDict(wordEl);
@@ -365,7 +365,7 @@
       if (data && data.error) throw new Error(data.error);
       data.sentence = sentence;
       cacheSet(key, data);
-      vocabAdd({ word: data.word || word, ipa: data.ipa, pos: data.pos, meaning: data.meaning, nuance: data.nuance, sentence: sentence, sentenceZh: data.sentenceZh });
+      vocabAdd({ word: data.word || word, ipa: data.ipa, pos: data.pos, meaning: data.meaning, nuance: data.nuance, sentence: sentence, sentenceZh: data.sentenceZh, src: src || "" });
       renderDict(el, word, data);
     } catch (e) {
       el.innerHTML = '<button class="close">×</button><div class="dw">' + esc(word) + "</div>" +
@@ -395,6 +395,7 @@
     const rec = {
       word: item.word, ipa: item.ipa || "", pos: item.pos || "", meaning: item.meaning || "",
       nuance: item.nuance || "", sentence: item.sentence || "", sentenceZh: item.sentenceZh || "",
+      src: item.src || (list[i] && list[i].src) || "",
       at: Date.now(),
     };
     if (i >= 0) list[i] = Object.assign({}, list[i], rec);
@@ -424,10 +425,12 @@
         '<div class="vmain">' +
           '<div><span class="vword">' + esc(it.word) + "</span>" +
           (it.ipa ? '<span class="vipa">' + esc(it.ipa) + "</span>" : "") +
-          (it.pos ? '<span class="vpos">' + esc(it.pos) + "</span>" : "") + "</div>" +
+          (it.pos ? '<span class="vpos">' + esc(it.pos) + "</span>" : "") +
+          (it.src ? '<span class="vsrc">选自' + esc(it.src) + "</span>" : "") + "</div>" +
           (it.meaning ? '<div class="vmean">' + esc(it.meaning) + "</div>" : "") +
           (it.nuance ? '<div class="vnu">' + esc(it.nuance) + "</div>" : "") +
           (it.sentence ? '<div class="vex">' + esc(it.sentence) + "</div>" : "") +
+          (it.sentenceZh ? '<div class="vzh">' + esc(it.sentenceZh) + "</div>" : "") +
         "</div>" +
         '<button class="vdel" title="删除">×</button></div>';
     }).join("");
@@ -1147,8 +1150,9 @@
     const w = e.target.closest(".w");
     if (w) {
       const sentence = sentenceAt(raw, Number(w.dataset.i));
+      const src = (p.classList.contains("readqh") || p.classList.contains("readqo")) ? "题目" : "文章";
       vocabTouch(w.textContent, sentence);
-      return openDict(w, sentence);
+      return openDict(w, sentence, src);
     }
     const g = e.target.closest(".g");
     if (g) {
@@ -1246,9 +1250,9 @@
   if (/[?&]cfg=1/.test(location.search)) $("#ovSettings").classList.add("show");
   if (/[?&]vocabdemo=1/.test(location.search)) {
     if (!vocabAll().length) {
-      vocabAdd({ word: "influencer", ipa: "/ˈɪnfluənsə/", pos: "n.", meaning: "网红；有影响力的人", nuance: "指靠社媒内容变现、拥有大量粉丝的人", sentence: "Influencers have large followings.", sentenceZh: "网红拥有大量粉丝。" });
-      vocabAdd({ word: "sealed off", ipa: "", pos: "短语", meaning: "被封锁的；与外界隔绝的", nuance: "此处指名气与奢侈品曾是小圈子的特权", sentence: "influencers rose by making fame and luxury less 'sealed off'.", sentenceZh: "网红通过让名气与奢侈不再封闭而崛起。" });
-      vocabAdd({ word: "vehement", ipa: "/ˈviːəmənt/", pos: "adj.", meaning: "激烈的；猛烈的", nuance: "修饰 critic，指批评得毫不留情", sentence: "A vehement one is Symeon Brown.", sentenceZh: "其中一位言辞激烈的批评者是西米恩·布朗。" });
+      vocabAdd({ word: "influencer", ipa: "/ˈɪnfluənsə/", pos: "n.", meaning: "网红；有影响力的人", nuance: "指靠社媒内容变现、拥有大量粉丝的人", sentence: "Influencers have large followings.", sentenceZh: "网红拥有大量粉丝。", src: "文章" });
+      vocabAdd({ word: "sealed off", ipa: "", pos: "短语", meaning: "被封锁的；与外界隔绝的", nuance: "此处指名气与奢侈品曾是小圈子的特权", sentence: "influencers rose by making fame and luxury less 'sealed off'.", sentenceZh: "网红通过让名气与奢侈不再封闭而崛起。", src: "文章" });
+      vocabAdd({ word: "vehement", ipa: "/ˈviːəmənt/", pos: "adj.", meaning: "激烈的；猛烈的", nuance: "修饰 critic，指批评得毫不留情", sentence: "A vehement one is Symeon Brown.", sentenceZh: "其中一位言辞激烈的批评者是西米恩·布朗。", src: "题目" });
     }
     renderVocab();
     $("#ovVocab").classList.add("show");
