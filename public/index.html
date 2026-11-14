@@ -71,7 +71,7 @@
   .col{display:flex;flex-direction:column;gap:16px;min-width:0}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
   .cardhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
-  .cardhead h2{margin:0;font-size:14.5px;letter-spacing:.03em}
+  .cardhead h2{margin:0;font-size:14.5px;letter-spacing:.03em;white-space:nowrap}
   .hint{color:var(--muted);font-size:12px}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
   .row.tight{margin:0}
@@ -106,6 +106,8 @@
   .myrow{display:flex;align-items:center;gap:8px;margin-bottom:10px}
   .myrow label{font-size:12.5px;color:var(--muted);white-space:nowrap}
   .myrow input{font-size:13px}
+  .kinds{flex:0 0 auto;margin-left:auto;padding:4px 8px;font-size:12.5px;border:1px solid var(--line);border-radius:8px;background:#fff;color:#22252a}
+  .ansrow input.mypick,.ansrow input.corpick{width:56px;text-align:center;font-family:Georgia,serif;text-transform:uppercase}
 
   /* ---------- question cards ---------- */
   .q{border:1px dashed #ddd7ca;border-radius:11px;padding:10px 12px;margin-bottom:10px;background:#fbfaf6}
@@ -311,7 +313,10 @@
     </div>
 
     <div class="card">
-      <div class="cardhead"><h2>② 题目与我的答案</h2><span class="hint">只填做错的也可以</span></div>
+      <div class="cardhead">
+        <h2>② 题目与我的答案</h2>
+        <select id="qkind" class="kinds" title="题型"><option value="mcq">仔细阅读</option><option value="match">段落匹配</option></select>
+      </div>
       <div class="myrow">
         <label>我那几题选的</label>
         <input id="myAns" type="text" placeholder="例如：21 B，22 A，23 D　（传图片时填这一行就够了）">
