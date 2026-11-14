@@ -671,23 +671,54 @@
   }
 
   async function gotoRecord(id, word) {
+    const item = vocabAll().filter(function (x) {
+      return String(x.word).toLowerCase() === String(word).toLowerCase();
+    })[0] || {};
     $("#ovVocab").classList.remove("show");
     try {
       await loadRecord(id);
     } catch (e) {
       return toast("打开失败：" + e.message);
     }
-    setTimeout(function () { jumpToWord(word); }, 450);
+    setTimeout(function () { jumpToWord(word, item.src, item.sentence); }, 450);
   }
 
-  function jumpToWord(word) {
-    const el = Array.from(document.querySelectorAll("#reading .w"));
+  function isQuestionBlock(el) {
+    const p = el.closest(".readp");
+    return !!(p && (p.classList.contains("readqh") || p.classList.contains("readqo")));
+  }
+
+  function jumpToWord(word, src, sentence) {
+    const all = Array.from(document.querySelectorAll("#reading .w"));
+    if (!all.length) return toast("文章里没找到这个词，可能已被改写");
     const key = stemKey(word);
-    const hit = el.find(function (x) {
+    const same = function (x) {
       const t = String(x.textContent).toLowerCase();
       return t === key || stemKey(t) === key || t === String(word).toLowerCase();
-    });
+    };
+
+    // 1) 记录里那句原句如果还能找到，就定位到那一句所在段落
+    if (sentence) {
+      const needle = String(sentence).slice(0, 40);
+      const para = Array.from(document.querySelectorAll("#reading .readp")).find(function (p) {
+        const raw = state.reading[Number(p.dataset.i)] || "";
+        return needle && raw.indexOf(needle) >= 0;
+      });
+      if (para) {
+        const inPara = Array.from(para.querySelectorAll(".w")).find(same);
+        if (inPara) return flashWord(inPara);
+      }
+    }
+
+    // 2) 按“选自文章 / 选自题目”优先，再退回全量
+    const wantQ = src === "题目";
+    const pool = all.filter(function (x) { return wantQ ? isQuestionBlock(x) : !isQuestionBlock(x); });
+    const hit = pool.find(same) || all.find(same);
     if (!hit) return toast("文章里没找到这个词，可能已被改写");
+    flashWord(hit);
+  }
+
+  function flashWord(hit) {
     hit.scrollIntoView({ block: "center" });
     hit.classList.add("w-jump");
     setTimeout(function () { hit.classList.remove("w-jump"); }, 2600);
