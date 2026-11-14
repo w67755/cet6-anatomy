@@ -339,15 +339,7 @@
     if (dictEl) { dictEl.remove(); dictEl = null; }
   }
 
-  function placeDict(el) {
-    const r = el.getBoundingClientRect();
-    const w = 340;
-    let left = Math.min(Math.max(10, r.left - 40), window.innerWidth - w - 14);
-    let top = r.bottom + 8;
-    if (top + 240 > window.innerHeight) top = Math.max(10, r.top - 248);
-    dictEl.style.left = left + "px";
-    dictEl.style.top = top + "px";
-  }
+  function placeDict() { /* 固定在右下角，避免盖住相邻的单词 */ }
 
   function dictShell(word) {
     closeDict();
@@ -1964,7 +1956,7 @@
     if (dictEl && !dictEl.contains(e.target) && !(e.target.closest && e.target.closest(".w"))) closeDict();
   });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDict(); });
-  window.addEventListener("scroll", function () { if (dictEl) closeDict(); }, true);
+  /* 固定卡片：滚动不再关闭，方便边滚边看 */
 
   $("#btnVocab").addEventListener("click", function () { renderVocab(); $("#ovVocab").classList.add("show"); });
   $("#closeVocab").addEventListener("click", function () { $("#ovVocab").classList.remove("show"); });
