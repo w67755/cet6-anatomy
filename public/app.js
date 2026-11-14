@@ -121,6 +121,13 @@
     renderThumbs();
   }
 
+  function clearImages() {
+    const had = state.images.length > 0;
+    state.images = [];
+    renderThumbs();
+    return had;
+  }
+
   function renderThumbs() {
     const box = $("#thumbs");
     box.innerHTML = state.images.map(function (im, i) {
@@ -1440,6 +1447,7 @@
   ];
 
   function loadDemo() {
+    clearImages();
     els.article.value = DEMO_ARTICLE;
     els.qlist.innerHTML = ""; qSeq = 0;
     DEMO_QS.forEach(addQuestion);
@@ -1663,6 +1671,7 @@
       const rec = r.record;
       els.article.value = rec.article || "";
       updateWc();
+      if (clearImages()) toast("已清空上一批照片：这条记录用转录的文字解剖，不会再读图");
       els.qlist.innerHTML = ""; qSeq = 0;
       (rec.questions || []).forEach(addQuestion);
       if (!els.qlist.children.length) addQuestion();
@@ -1947,6 +1956,11 @@
     renderVocab();
     if (!/[?&]vocabdemo=seed/.test(location.search)) $("#ovVocab").classList.add("show");
   }
+  if (/[?&]imgdemo=1/.test(location.search)) setTimeout(function () {
+    const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    state.images = [{ name: "demo1.jpg", dataUrl: png, w: 1, h: 1, kb: 1 }, { name: "demo2.jpg", dataUrl: png, w: 1, h: 1, kb: 1 }];
+    renderThumbs();
+  }, 300);
   if (/[?&]loaddemo=1/.test(location.search)) setTimeout(async function () {
     try {
       const list = await api("/api/records");
