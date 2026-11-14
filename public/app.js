@@ -121,11 +121,14 @@
     renderThumbs();
   }
 
-  function resetWorkbench() {
+  function resetWorkbench(opts) {
+    opts = opts || {};
     els.article.value = "";
     updateWc();
-    state.images = [];
-    renderThumbs();
+    if (!opts.keepImages) {
+      state.images = [];
+      renderThumbs();
+    }
     els.qlist.innerHTML = "";
     qSeq = 0;
     state.kind = "mcq";
@@ -1898,6 +1901,7 @@
     await deleteRecords(ids);
   });
   $("#btnNew").addEventListener("click", newSession);
+  $("#nextOne").addEventListener("click", newSession);
   $("#btnSplit").addEventListener("click", doSplit);
   $("#splitClose").addEventListener("click", function () { $("#ovSplit").classList.remove("show"); });
   $("#splitSave").addEventListener("click", saveSplit);
