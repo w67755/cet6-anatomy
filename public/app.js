@@ -894,39 +894,72 @@
     $("#ovQuiz").classList.remove("show");
     toast("已生成：发到 iPad 用浏览器打开就能做");
   }
-  async function doQuiz() {
+  let lastQuiz = null;
+
+  async function buildQuizData() {
     const mode = document.querySelector('input[name="qmode"]:checked').value;
     const scope = $("#qscope").value;
     const n = Number($("#qcount").value) || 15;
     const words = quizWords(scope);
     if (!words.length) {
-      return qErr(scope === "focus" ? "重点词还是空的：先查几个词，或者手动 ★ 标记。" : "生词本还是空的。");
+      qErr(scope === "focus" ? "重点词还是空的：先查几个词，或者手动 ★ 标记。" : "生词本还是空的。");
+      return null;
     }
     if (mode === "words") {
-      if (words.length < 4) return qErr("至少要有 4 个生词才能出选择题（现在 " + words.length + " 个）。");
+      if (words.length < 4) {
+        qErr("至少要有 4 个生词才能出选择题（现在 " + words.length + " 个）。");
+        return null;
+      }
       const items = buildWordItems(words, n);
-      return downloadQuiz({ mode: "words", title: "六级生词自测", sub: "共 " + items.length + " 题 · " + dateStr() + " · 点选项作答", items: items });
+      return { mode: "words", title: "六级生词自测", sub: "共 " + items.length + " 题 · " + dateStr() + " · 点选项作答", items: items };
     }
-    if (words.length < 3) return qErr("至少要有 3 个生词。");
+    if (words.length < 3) {
+      qErr("至少要有 3 个生词。");
+      return null;
+    }
     const pick = shuffle(words).slice(0, 8);
-    const btn = $("#qGo");
-    btn.disabled = true; btn.textContent = "生成中…";
+    const btn = $("#qGo"), pv = $("#qPreview");
+    btn.disabled = true; pv.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = "生成中…"; pv.textContent = "生成中…";
     try {
       const r = await api("/api/quiz", { words: pick.map(function (w) { return { word: w.word, meaning: w.meaning }; }) });
       if (r && r.error) throw new Error(r.error);
-      downloadQuiz({
+      return {
         mode: "passage",
         title: r.title || "生词阅读练习",
         sub: "用你生词本里的 " + pick.length + " 个词生成 · " + dateStr(),
         passage: r.passage,
         words: pick.map(function (w) { return { w: w.word, m: w.meaning }; }),
         questions: r.questions || [],
-      });
+      };
     } catch (e) {
       qErr("生成失败：" + (e && e.message ? e.message : e));
+      return null;
     } finally {
-      btn.disabled = false; btn.textContent = "生成并下载";
+      btn.disabled = false; pv.disabled = false;
+      btn.textContent = old; pv.textContent = "先预览";
     }
+  }
+
+  async function runQuiz(action) {
+    qErr("");
+    const data = await buildQuizData();
+    if (!data) return;
+    const html = quizPageHtml(data);
+    lastQuiz = { html: html, name: "六级练习-" + stamp() + ".html" };
+    if (action === "download") return saveQuiz();
+    $("#quizFrame").srcdoc = html;
+    $("#ovQuiz").classList.remove("show");
+    $("#ovPreview").classList.add("show");
+  }
+
+  function saveQuiz() {
+    if (!lastQuiz) return toast("先生成一份练习");
+    downloadBlob(new Blob([lastQuiz.html], { type: "text/html;charset=utf-8" }), lastQuiz.name);
+    $("#ovPreview").classList.remove("show");
+    $("#ovQuiz").classList.remove("show");
+    toast("已下载：" + lastQuiz.name);
   }
 
   /* ---------------- questions ---------------- */
@@ -1583,7 +1616,10 @@
     $("#ovQuiz").classList.add("show");
   });
   $("#qClose").addEventListener("click", function () { $("#ovQuiz").classList.remove("show"); });
-  $("#qGo").addEventListener("click", doQuiz);
+  $("#qGo").addEventListener("click", function () { runQuiz("download"); });
+  $("#qPreview").addEventListener("click", function () { runQuiz("preview"); });
+  $("#pvClose").addEventListener("click", function () { $("#ovPreview").classList.remove("show"); $("#quizFrame").srcdoc = ""; });
+  $("#pvDownload").addEventListener("click", saveQuiz);
   Array.from(document.querySelectorAll('input[name="qmode"]')).forEach(function (r) {
     r.addEventListener("change", function () {
       const isWords = document.querySelector('input[name="qmode"]:checked').value === "words";
@@ -1659,6 +1695,12 @@
     if (!vocabAll().length) seedDemoVocab();
     const words = vocabAll().filter(function (w) { return w.word && w.meaning; });
     let data;
+    if (mode === "preview") {
+      const items = buildWordItems(words, 15);
+      $("#quizFrame").srcdoc = quizPageHtml({ mode: "words", title: "六级生词自测", sub: "共 " + items.length + " 题 · demo", items: items });
+      $("#ovPreview").classList.add("show");
+      return;
+    }
     if (mode === "passage") {
       try {
         const r = await api("/api/quiz", { words: words.slice(0, 8).map(function (w) { return { word: w.word, meaning: w.meaning }; }) });
