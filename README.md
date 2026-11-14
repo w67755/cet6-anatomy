@@ -1,5 +1,9 @@
 # 六级阅读错题解剖台
 
+[![ci](https://github.com/w67755/cet6-anatomy/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/w67755/cet6-anatomy/actions/workflows/ci.yml)
+[![node](https://img.shields.io/badge/node-%E2%89%A518-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 > 拍一页试卷，换一份"为什么错"的报告。
 
 把六级阅读的文章和题目（**文字或照片**）丢进去，它按固定的套路拆：逐段定位 → 选项溯源 → 错因命名 → 点词查义 → 生词本导出。
@@ -108,4 +112,4 @@ node --check public/app.js
 
 ## License
 
-暂未指定。若要开源给别人用，建议补一个 [MIT](https://choosealicense.com/licenses/mit/)。
+[MIT](LICENSE) © 2026 w67755 —— 随便用、随便改、随便发，保留版权声明即可。
