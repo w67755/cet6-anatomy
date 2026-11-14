@@ -92,6 +92,18 @@ const SENTENCE_SYSTEM = [
   "要求：翻译要像人话，不要逐词硬译；专业名词保留通用译法。",
 ].join("\n");
 
+const QUIZ_SYSTEM = [
+  "你是中国大学英语六级（CET-6）的命题人。",
+  "学生会给你一组单词，你要写一篇英文短文，并围绕它出题。",
+  "要求：",
+  "1. 短文 300–380 词，体裁为说明文或议论文，话题自选但要连贯、有观点，难度贴近六级阅读。",
+  "2. 必须自然地用上单词表里的每一个词（可变形），并在正文中用 **单词** 的形式加粗标出。",
+  "3. 之后出 5 道单选题：2 道细节、1 道推断、1 道词义、1 道主旨；每题 4 个选项，只有一个正确。",
+  "4. 题干用英文，解析用中文。",
+  "5. 只输出 JSON，不要解释、不要代码块围栏：",
+  '{"title":"短文标题","passage":"正文，含 **word** 标记","questions":[{"stem":"…","options":{"A":"…","B":"…","C":"…","D":"…"},"answer":"B","why":"…"}]}',
+].join("\n");
+
 function questionBlock(qs) {
   return (qs || []).map((q, i) => {
     const no = q.no || i + 1;
@@ -415,6 +427,62 @@ const server = http.createServer(async (req, res) => {
       { role: "user", content: userContent },
     ];
     return streamUpstream(res, messages, cfg);
+  }
+
+  if (u.pathname === "/api/quiz" && req.method === "POST") {
+    const b = await body(req);
+    const cfg = getSettings();
+    const reply = (obj, code) => {
+      res.writeHead(code || 200, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify(obj));
+    };
+    const words = (Array.isArray(b.words) ? b.words : [])
+      .slice(0, 20)
+      .map((w) => ({ word: String(w.word || "").trim(), meaning: String(w.meaning || "").trim() }))
+      .filter((w) => w.word);
+    if (!words.length) return reply({ error: "没有可用的生词" }, 400);
+    if (!cfg.apiKey) return reply({ error: "生成新文章需要 API Key，可以先用「词卡自测」" }, 400);
+
+    const base = String(cfg.baseUrl || "").replace(/\/+$/, "");
+    const list = words.map((w) => "- " + w.word + (w.meaning ? "（" + w.meaning + "）" : "")).join("\n");
+    const payload = {
+      model: cfg.model || "deepseek-flash",
+      messages: [
+        { role: "system", content: QUIZ_SYSTEM },
+        { role: "user", content: "单词表：\n" + list + "\n\n请写短文并出 5 道题。" },
+      ],
+      thinking: { type: "disabled" },
+      response_format: { type: "json_object" },
+      temperature: 0.85,
+      max_tokens: 2500,
+      stream: false,
+    };
+
+    try {
+      const r = await fetch(base + "/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.apiKey },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(90000),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        return reply({ error: "上游返回 " + r.status + "：" + t.slice(0, 220) }, 502);
+      }
+      const j = await r.json();
+      const raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || "";
+      const cleaned = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+      let data = null;
+      try { data = JSON.parse(cleaned); } catch { 
+        const m = cleaned.match(/\{[\s\S]*\}/);
+        if (m) { try { data = JSON.parse(m[0]); } catch {} }
+      }
+      if (!data || !data.passage) return reply({ error: "生成结果解析失败：" + cleaned.slice(0, 120) }, 502);
+      const qs = (Array.isArray(data.questions) ? data.questions : []).slice(0, 8);
+      return reply({ title: data.title || "生词阅读练习", passage: String(data.passage), questions: qs });
+    } catch (e) {
+      return reply({ error: "生成失败：" + String((e && e.message) || e) }, 502);
+    }
   }
 
   if (u.pathname === "/api/lookup" && req.method === "POST") {
