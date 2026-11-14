@@ -144,6 +144,40 @@
     return m ? m[1].trim() : "";
   }
 
+  function parseQuestionsFromMd(mdText) {
+    const m = /##[^\n]*我读到的题目[^\n]*\n([\s\S]*?)(?=\n##\s|$)/.exec(String(mdText || ""));
+    if (!m) return [];
+    const qs = [];
+    let cur = null;
+    m[1].split("\n").forEach(function (raw) {
+      const line = raw.trim().replace(/^[-*]\s+/, "");
+      if (!line || line.charAt(0) === "|") return;
+      const qm = line.match(/^\*{0,2}(\d{1,3})[.、)]\*{0,2}\s*(.+)$/);
+      if (qm && !/^[A-D][.)、]/.test(line)) {
+        if (cur) qs.push(cur);
+        cur = { no: qm[1], stem: qm[2].replace(/\*\*/g, ""), opts: {}, my: "", ans: "" };
+        return;
+      }
+      const om = line.match(/^\**([A-D])[.)、]\**\s*(.+)$/);
+      if (om && cur) { cur.opts[om[1]] = om[2].replace(/\*\*/g, ""); return; }
+      if (cur) {
+        const my = line.match(/我选[：:]\s*\**([A-D])/);
+        if (my) cur.my = my[1];
+        const an = line.match(/答案[：:]\s*\**([A-D]|待定)/);
+        if (an) cur.ans = an[1];
+      }
+    });
+    if (cur) qs.push(cur);
+    return qs.filter(function (q) { return q.stem; });
+  }
+
+  function questionsFromCards() {
+    return collect().map(function (q, i) {
+      if (!q.stem && !q.options.A) return null;
+      return { no: String(i + 1), stem: q.stem, opts: q.options, my: q.my, ans: q.correct };
+    }).filter(Boolean);
+  }
+
   function wordify(text) {
     const re = /([A-Za-z][A-Za-z'’\-]*)/g;
     let out = "", last = 0, m;
@@ -178,19 +212,50 @@
     return text.slice(start, end).trim();
   }
 
-  function setReading(text) {
-    const clean = String(text || "").replace(/```[\s\S]*?```/g, "").trim();
+  function cardsToQs(list) {
+    return (list || []).map(function (q, i) {
+      if (!q || (!q.stem && !(q.options && q.options.A))) return null;
+      return { no: String(q.no || i + 1), stem: q.stem || "", opts: q.options || {}, my: q.my || "", ans: q.correct || "" };
+    }).filter(Boolean);
+  }
+
+  function setReading(text, qs) {
+    const clean = String(text || "").replace(/```[sS]*?```/g, "").trim();
     const paras = clean.split(/\n{2,}/).map(function (t) {
       return t.replace(/\n+/g, " ").replace(/\s+/g, " ").trim();
     }).filter(Boolean);
+
+    const blocks = [];
+    paras.forEach(function (t) { blocks.push({ t: t, cls: "readp" }); });
+    if (qs && qs.length) {
+      blocks.push({ label: "题目 / QUESTIONS", cls: "readh" });
+      qs.forEach(function (q) {
+        blocks.push({ t: q.no + ". " + q.stem, cls: "readp readqh" });
+        ["A", "B", "C", "D"].forEach(function (k) {
+          if (q.opts && q.opts[k]) blocks.push({ t: k + ") " + q.opts[k], cls: "readp readqo" });
+        });
+        if (q.my || q.ans) {
+          blocks.push({ label: "我选 " + (q.my || "—") + "　｜　答案 " + (q.ans || "—"), cls: "readmeta" });
+        }
+      });
+    }
+
     const card = $("#readCard");
-    if (!paras.length) { card.style.display = "none"; state.reading = []; const j0 = $("#toRead"); if (j0) j0.style.display = "none"; return; }
-    state.reading = paras;
-    card.style.display = "";
     const jump = $("#toRead");
+    if (!blocks.length) {
+      card.style.display = "none";
+      state.reading = [];
+      if (jump) jump.style.display = "none";
+      return;
+    }
+    state.reading = blocks.map(function (b) { return b.t || ""; });
+    card.style.display = "";
     if (jump) jump.style.display = "";
-    $("#reading").innerHTML = paras.map(function (p, i) {
-      return '<p class="readp" data-i="' + i + '">' + wordify(p) + "</p>";
+    $("#reading").innerHTML = blocks.map(function (b, i) {
+      if (b.cls === "readh" || b.cls === "readmeta") {
+        return '<div class="' + b.cls + '">' + esc(b.label) + "</div>";
+      }
+      return '<p class="' + b.cls + '" data-i="' + i + '">' + wordify(b.t) + "</p>";
     }).join("");
   }
 
@@ -660,7 +725,8 @@
         return;
       }
       state.analysis = acc;
-      setReading(extractReading(acc) || article);
+      const parsedQs = parseQuestionsFromMd(acc);
+      setReading(extractReading(acc) || article, parsedQs.length ? parsedQs : questionsFromCards());
       await saveRecord();
       setBusy(false, "报告已存进错题本。可以直接在下面追问。");
     } catch (e) {
@@ -804,7 +870,7 @@
     els.qlist.innerHTML = ""; qSeq = 0;
     DEMO_QS.forEach(addQuestion);
     updateWc();
-    setReading(DEMO_ARTICLE);
+    setReading(DEMO_ARTICLE, cardsToQs(DEMO_QS.map(function (q, i) { return { no: i + 21, stem: q.stem, options: q.options, my: q.my, correct: q.correct }; })));
     toast("已填入示例：2024 年 12 月六级 Passage 3 的 21–23 题");
   }
 
@@ -917,7 +983,9 @@
       state.analysis = rec.analysis || "";
       state.chat = rec.chat || [];
       $("#result").innerHTML = state.analysis ? md(state.analysis) : '<div class="empty">这份记录还没有报告。</div>';
-      setReading(extractReading(state.analysis) || rec.article || "");
+      const recQs = parseQuestionsFromMd(state.analysis);
+      setReading(extractReading(state.analysis) || rec.article || "",
+        recQs.length ? recQs : cardsToQs(rec.questions));
       els.msgs.innerHTML = "";
       state.chat.forEach(function (m) { pushMsg(m.role === "user" ? "user" : "bot", m.content); });
       $("#ovHistory").classList.remove("show");
