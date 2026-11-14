@@ -560,12 +560,12 @@
   }
 
   async function saveRecord() {
-    const article = els.article.value.trim();
+    const article = els.article.value.trim() || extractReading(state.analysis) || "";
     const questions = collect();
-    if (!article) return;
+    if (!article && !questions.length) return;
     const payload = {
       id: state.recordId,
-      title: questions.length ? (questions[0].stem.slice(0, 28) || "未命名") : "未命名",
+      title: questions.length ? (questions[0].stem.slice(0, 28) || "未命名") : (article.slice(0, 24) || "未命名"),
       article: article,
       questions: questions,
       analysis: state.analysis,
@@ -754,9 +754,9 @@
   }
 
   async function saveToNotebook() {
-    const article = els.article.value.trim();
+    const article = els.article.value.trim() || extractReading(state.analysis) || "";
     const questions = collect();
-    if (!article && !questions.length) return toast("先填文章或题目，再存");
+    if (!article && !questions.length) return toast("先填文章、传照片或跑一次解剖，再存");
     try {
       const r = await api("/api/records", {
         id: state.recordId,
@@ -889,6 +889,20 @@
     } catch (e) { box.innerHTML = '<p class="hint">读取失败：' + esc(e.message) + "</p>"; }
   }
 
+  async function importMarkdown(file) {
+    if (!file) return;
+    let text = "";
+    try { text = await file.text(); } catch (e) { return toast("读取失败：" + e.message); }
+    if (!text.trim()) return toast("这个文件是空的");
+    const head = (text.match(/^#s+(.+)$/m) || [])[1];
+    const title = (head || file.name.replace(/.[^.]+$/, "")).slice(0, 40) || "导入的报告";
+    try {
+      await api("/api/records", { title: title, article: extractReading(text), questions: [], analysis: text, chat: [] });
+      await openHistory();
+      toast("已导入：" + title);
+    } catch (e) { toast("导入失败：" + e.message); }
+  }
+
   async function loadRecord(id) {
     try {
       const r = await api("/api/records?id=" + encodeURIComponent(id));
@@ -974,6 +988,11 @@
   $("#saveSettings").addEventListener("click", saveSettings);
   $("#btnHistory").addEventListener("click", openHistory);
   $("#closeHistory").addEventListener("click", function () { $("#ovHistory").classList.remove("show"); });
+  $("#mdImport").addEventListener("change", function (e) {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    importMarkdown(f);
+  });
   $("#bulkQ").addEventListener("click", function () { $("#ovBulk").classList.add("show"); });
   $("#cancelBulk").addEventListener("click", function () { $("#ovBulk").classList.remove("show"); });
   $("#doBulk").addEventListener("click", function () {
