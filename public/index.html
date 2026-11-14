@@ -193,6 +193,16 @@
   .vtools{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 14px}
   .vempty{color:var(--muted);padding:26px 0;text-align:center;font-size:13px}
 
+  /* 错题本列表 */
+  .rrow{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff;cursor:pointer}
+  .rrow:hover{border-color:#c9d3de;background:#fafbfc}
+  .rrow input[type=checkbox]{margin-top:4px;width:16px;height:16px;accent-color:#1c4f82;cursor:pointer}
+  .rmain{flex:1;min-width:0}
+  .rmain b{font-size:13.5px}
+  .rmain small{display:block;color:var(--muted);font-size:11.5px;margin-top:3px}
+  .rdel{border:none;background:none;color:#c3bcae;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1}
+  .rdel:hover{color:var(--red)}
+
   /* ---------- chat ---------- */
   .msgs{display:flex;flex-direction:column;gap:10px;max-height:46vh;overflow:auto;padding-right:4px}
   .msg{border-radius:11px;padding:9px 12px;font-size:13.8px;max-width:96%}
@@ -365,6 +375,13 @@
     <div class="vtools" style="margin-bottom:12px">
       <label class="btn ghost sm">导入 .md 报告<input type="file" id="mdImport" accept=".md,.markdown,.txt" hidden></label>
       <span class="hint" style="align-self:center">支持「③ 解剖报告」里导出的文件</span>
+    </div>
+    <div class="vtools" id="recTools" style="display:none">
+      <button class="btn ghost sm" id="rAll">全选</button>
+      <button class="btn ghost sm" id="rNone">全不选</button>
+      <button class="btn ghost sm" id="rDelSel">删除选中</button>
+      <span style="flex:1"></span>
+      <span class="hint" id="rCount"></span>
     </div>
     <div id="recList"></div>
     <div class="foot"><button class="btn ghost" id="closeHistory">关闭</button></div>

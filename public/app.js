@@ -475,6 +475,19 @@
     a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
   }
+  function makeTitle(article, questions) {
+    if (questions && questions.length && questions[0].stem) return questions[0].stem.slice(0, 30).trim();
+    const t = String(article || "")
+      .replace(/\*\*/g, " ").replace(/¶\s*\d+/g, " ").replace(/\bPassage\s*\d+\b/gi, " ")
+      .replace(/[#>`]/g, " ").replace(/\s+/g, " ").trim();
+    if (!t) {
+      const d = new Date();
+      const p = function (n) { return String(n).padStart(2, "0"); };
+      return (d.getMonth() + 1) + "-" + d.getDate() + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + " 的报告";
+    }
+    return t.slice(0, 30);
+  }
+
   function stamp() {
     const d = new Date();
     const p = function (n) { return String(n).padStart(2, "0"); };
@@ -630,7 +643,7 @@
     if (!article && !questions.length) return;
     const payload = {
       id: state.recordId,
-      title: questions.length ? (questions[0].stem.slice(0, 28) || "未命名") : (article.slice(0, 24) || "未命名"),
+      title: makeTitle(article, questions),
       article: article,
       questions: questions,
       analysis: state.analysis,
@@ -826,7 +839,7 @@
     try {
       const r = await api("/api/records", {
         id: state.recordId,
-        title: questions.length ? (questions[0].stem.slice(0, 28) || "未命名") : (article.slice(0, 24) || "未命名"),
+        title: makeTitle(article, questions),
         article: article, questions: questions, analysis: state.analysis, chat: state.chat,
       });
       if (r && r.id) state.recordId = r.id;
@@ -933,26 +946,68 @@
   }
 
   /* ---------------- history ---------------- */
+  let recCache = [];
+
   async function openHistory() {
     $("#ovHistory").classList.add("show");
     const box = $("#recList");
     box.innerHTML = '<p class="hint">加载中…</p>';
     try {
-      const list = await api("/api/records");
-      if (!list.length) {
-        box.innerHTML = '<div class="vempty">还没有记录。<br>跑完一次「开始解剖」会自动存一份；<br>' +
-          '只生成了提示词（没配 Key）时不会存档，可以点左边「只存到错题本」手动存。</div>';
-        return;
-      }
-      box.innerHTML = list.map(function (r) {
-        const d = new Date(r.createdAt || Date.now());
-        return '<div class="rec" data-id="' + r.id + '"><b>' + esc(r.title || "未命名") + "</b>" +
-          "<small>" + d.toLocaleString("zh-CN") + " · " + (r.qcount || 0) + " 题 · " + ((r.analysis || "").length) + " 字报告</small></div>";
-      }).join("");
-      Array.from(box.querySelectorAll(".rec")).forEach(function (el) {
-        el.addEventListener("click", function () { return loadRecord(el.dataset.id); });
+      recCache = await api("/api/records");
+      renderRecList();
+    } catch (e) {
+      box.innerHTML = '<p class="hint">读取失败：' + esc(e.message) + "</p>";
+    }
+  }
+
+  function renderRecList() {
+    const box = $("#recList");
+    const tools = $("#recTools");
+    if (!recCache.length) {
+      box.innerHTML = '<div class="vempty">还没有记录。<br>跑完一次「开始解剖」会自动存一份；<br>' +
+        '只生成了提示词（没配 Key）时不会存档，可以点左边「只存到错题本」手动存。</div>';
+      if (tools) tools.style.display = "none";
+      return;
+    }
+    if (tools) tools.style.display = "flex";
+    const c = $("#rCount");
+    if (c) c.textContent = "共 " + recCache.length + " 条";
+    box.innerHTML = recCache.map(function (r) {
+      const d = new Date(r.createdAt || Date.now());
+      return '<div class="rrow" data-id="' + r.id + '">' +
+        '<input type="checkbox" class="rchk">' +
+        '<div class="rmain"><b>' + esc(r.title || "未命名") + "</b>" +
+        "<small>" + d.toLocaleString("zh-CN") + " · " + (r.qcount || 0) + " 题 · " +
+        ((r.analysis || "").length) + " 字报告</small></div>" +
+        '<button class="rdel" title="删除这条">×</button></div>';
+    }).join("");
+
+    Array.from(box.querySelectorAll(".rrow")).forEach(function (row) {
+      row.querySelector(".rmain").addEventListener("click", function () { loadRecord(row.dataset.id); });
+      row.querySelector(".rdel").addEventListener("click", async function (e) {
+        e.stopPropagation();
+        const id = row.dataset.id;
+        const name = row.querySelector(".rmain b").textContent;
+        if (!(await confirmBox("删除这条记录", "《" + name + "》删除后无法恢复。"))) return;
+        await deleteRecords([id]);
       });
-    } catch (e) { box.innerHTML = '<p class="hint">读取失败：' + esc(e.message) + "</p>"; }
+    });
+  }
+
+  async function deleteRecords(ids) {
+    for (const id of ids) {
+      try { await api("/api/records?id=" + encodeURIComponent(id), null, "DELETE"); } catch (e) { toast("删除失败：" + e.message); return; }
+      if (state.recordId === id) state.recordId = null;
+    }
+    recCache = recCache.filter(function (r) { return ids.indexOf(r.id) < 0; });
+    renderRecList();
+    toast("已删除 " + ids.length + " 条");
+  }
+
+  function recChecked() {
+    return Array.from(document.querySelectorAll("#recList .rrow"))
+      .filter(function (r) { return r.querySelector(".rchk").checked; })
+      .map(function (r) { return r.dataset.id; });
   }
 
   async function importMarkdown(file) {
@@ -1056,6 +1111,20 @@
   $("#saveSettings").addEventListener("click", saveSettings);
   $("#btnHistory").addEventListener("click", openHistory);
   $("#closeHistory").addEventListener("click", function () { $("#ovHistory").classList.remove("show"); });
+  function on(sel, ev, fn) { const el = $(sel); if (el) el.addEventListener(ev, fn); }
+
+  on("#rAll", "click", function () {
+    Array.from(document.querySelectorAll("#recList .rchk")).forEach(function (c) { c.checked = true; });
+  });
+  on("#rNone", "click", function () {
+    Array.from(document.querySelectorAll("#recList .rchk")).forEach(function (c) { c.checked = false; });
+  });
+  on("#rDelSel", "click", async function () {
+    const ids = recChecked();
+    if (!ids.length) return toast("先勾选要删除的记录");
+    if (!(await confirmBox("删除选中的记录", "将删除 " + ids.length + " 条记录，无法恢复。"))) return;
+    await deleteRecords(ids);
+  });
   $("#mdImport").addEventListener("change", function (e) {
     const f = e.target.files && e.target.files[0];
     e.target.value = "";
@@ -1184,6 +1253,7 @@
     renderVocab();
     $("#ovVocab").classList.add("show");
   }
+  if (/[?&]historydemo=1/.test(location.search)) setTimeout(openHistory, 400);
   if (/[?&]dictdemo=1/.test(location.search)) setTimeout(function () {
     const w = document.querySelector("#reading .w");
     if (!w || !window.__dict) return;
