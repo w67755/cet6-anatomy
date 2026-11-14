@@ -295,7 +295,7 @@
   }
 
   function setReading(text, qs) {
-    const clean = String(text || "").replace(/```[sS]*?```/g, "").trim();
+    const clean = String(text || "").replace(/```[\s\S]*?```/g, "").replace(/\*\*/g, "").trim();
     const paras = clean.split(/\n{2,}/).map(function (t) {
       return t.replace(/\n+/g, " ").replace(/\s+/g, " ").trim();
     }).filter(Boolean);
@@ -424,6 +424,12 @@
     const hit = cacheGet(key);
     if (hit) {
       hit.sentence = sentence;
+      const known = vocabIndex()[String(word).toLowerCase()];
+      if (!known) {
+        vocabAdd({ word: hit.word || word, ipa: hit.ipa, pos: hit.pos, meaning: hit.meaning, nuance: hit.nuance, sentence: sentence, sentenceZh: hit.sentenceZh, src: src || "" });
+      } else {
+        vocabTouch(hit.word || word);
+      }
       return renderDict(el, word, hit);
     }
     wordEl.classList.add("loading");
@@ -1953,7 +1959,12 @@
     openSentence(w, sentenceAt(raw, Number(w.dataset.i)));
   });
   document.addEventListener("click", function (e) {
-    if (dictEl && !dictEl.contains(e.target) && !(e.target.closest && e.target.closest(".w"))) closeDict();
+    if (!dictEl) return;
+    if (dictEl.contains(e.target)) {
+      if (!(e.target.closest && e.target.closest("button"))) closeDict();
+      return;
+    }
+    if (!(e.target.closest && e.target.closest(".w"))) closeDict();
   });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDict(); });
   /* 固定卡片：滚动不再关闭，方便边滚边看 */
