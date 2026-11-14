@@ -167,6 +167,8 @@
   .vhits{color:#b3352b;font-size:10.5px;border:1px solid #f0cfc9;background:#fdf1ef;border-radius:9px;padding:0 5px;margin-left:6px}
   .vstar{border:none;background:none;cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;color:#d8d2c6}
   .vstar.on{color:#e0a300}
+  .vdue{color:#b3352b;font-weight:700;margin-right:6px}
+  .vbadge{color:#8a6100;background:#fff3d9;border:1px solid #f0dda6;border-radius:9px;padding:0 5px;font-size:10.5px;margin-left:6px}
   .vfocus{color:#b3352b;background:#fdecea;border:1px solid #f3d3cf;border-radius:9px;padding:0 5px;margin-left:6px;font-size:10.5px}
   .vlinks{margin-top:8px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
   .vlink{font-size:12.5px;color:#1c4f82;text-align:left}
@@ -429,11 +431,12 @@ D) The influencer industry has grown to about $250 billion by now."></textarea>
 <div class="overlay" id="ovVocab">
   <div class="sheet" style="width:min(760px,100%)">
     <h3>生词本</h3>
-    <div class="sub">查过的词会自动收进来。勾选要保留的，删掉已经会的，再导出成 PDF / Word 复习。</div>
+    <div class="sub">查过的词会自动收进来。<span id="vDue" class="vdue"></span>勾选要保留的，删掉已经会的，再导出成 PDF / Word 复习。</div>
     <div class="vtools">
       <button class="btn ghost sm" id="vAll">全选</button>
       <button class="btn ghost sm" id="vNone">全不选</button>
       <button class="btn ghost sm" id="vDelSel">删除选中</button>
+      <button class="btn ghost sm" id="vImport">导入练习结果</button>
       <span style="flex:1"></span>
       <button class="btn sm" id="vPdf">导出 PDF</button>
       <button class="btn primary sm" id="vWord">导出 Word</button>
@@ -443,6 +446,19 @@ D) The influencer industry has grown to about $250 billion by now."></textarea>
     <div class="foot">
       <button class="btn ghost" id="vClear">清空生词本</button>
       <button class="btn ghost" id="closeVocab">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovResult">
+  <div class="sheet" style="width:min(560px,100%)">
+    <h3>导入练习结果</h3>
+    <div class="sub">做完导出的练习册后，把页面最下方那段「结果码」复制过来。做错的词会 +1 次并列入重点，做对的词下次复习时间往后推。</div>
+    <textarea id="resText" style="min-height:120px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px" placeholder="CET6Q1|vehement;scrutiny|influencer;underbelly"></textarea>
+    <div class="cfgerr" id="resErr"></div>
+    <div class="foot">
+      <button class="btn ghost" id="resClose">取消</button>
+      <button class="btn primary" id="resGo">导入</button>
     </div>
   </div>
 </div>
@@ -462,7 +478,7 @@ D) The influencer industry has grown to about $250 billion by now."></textarea>
     </div>
     <div class="field">
       <label>范围</label>
-      <select id="qscope"><option value="all">全部生词</option><option value="focus">只要重点词（★ 或查过 ≥2 次）</option></select>
+      <select id="qscope"><option value="all">全部生词</option><option value="due" id="qdDue">今天该复习的</option><option value="focus">只要重点词（★ 或查过 ≥2 次）</option></select>
     </div>
     <div class="cfgerr" id="qErr"></div>
     <div class="foot">

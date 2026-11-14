@@ -412,6 +412,9 @@
       src: item.src || (prev && prev.src) || "",
       hits: prev ? (prev.hits || 1) + 1 : 1,
       star: prev ? !!prev.star : false,
+      box: prev ? (prev.box || 0) : 0,
+      due: prev ? (prev.due || Date.now()) : Date.now(),
+      last: prev ? (prev.last || 0) : 0,
       at: Date.now(),
     };
     if (i >= 0) list[i] = rec; else list.unshift(rec);
@@ -419,7 +422,17 @@
     refreshWordMarks();
   }
 
+  const DAY = 86400000;
+  const INTERVAL = [1, 3, 7, 16, 35, 60]; // box 0..5 对应的下次复习间隔（天）
+
   function isFocus(it) { return !!(it && (it.star || (it.hits || 1) >= 2)); }
+  function dueOf(it) { return it.due || it.at || 0; }
+  function isDue(it, now) { return dueOf(it) <= (now || Date.now()); }
+  function dueList() {
+    const now = Date.now();
+    return vocabAll().filter(function (x) { return x.word && isDue(x, now); })
+      .sort(function (x, y) { return dueOf(x) - dueOf(y); });
+  }
 
   function stemKey(w) {
     w = String(w || "").toLowerCase().trim();
@@ -455,9 +468,52 @@
     vocabSave(vocabAll().filter(function (x) { return String(x.word).toLowerCase() !== String(word).toLowerCase(); }));
   }
 
+  function parseResultCode(text) {
+    const t = String(text || "").trim();
+    const m = /^CET6Q1\|([^|]*)\|([^|]*)$/.exec(t);
+    if (!m) return null;
+    const sp = function (s) {
+      return String(s || "").split(";").map(function (x) { return x.trim(); }).filter(Boolean);
+    };
+    return { wrong: sp(m[1]), right: sp(m[2]) };
+  }
+
+  function applyQuizResult(res) {
+    const list = vocabAll();
+    const now = Date.now();
+    let n = 0;
+    function idx(w) {
+      return list.findIndex(function (x) { return String(x.word).toLowerCase() === String(w).toLowerCase(); });
+    }
+    res.wrong.forEach(function (w) {
+      const i = idx(w);
+      if (i < 0) return;
+      list[i].hits = (list[i].hits || 1) + 1;
+      list[i].box = 0;
+      list[i].last = now;
+      list[i].due = now + DAY * INTERVAL[0];
+      n++;
+    });
+    res.right.forEach(function (w) {
+      const i = idx(w);
+      if (i < 0) return;
+      list[i].box = Math.min(5, (list[i].box || 0) + 1);
+      list[i].last = now;
+      list[i].due = now + DAY * INTERVAL[list[i].box];
+      n++;
+    });
+    vocabSave(list);
+    return n;
+  }
+
   function renderVocab() {
     const all = vocabAll();
     vocabSave(all);
+    const dueN = all.filter(function (x) { return x.word && isDue(x); }).length;
+    const dueEl = $("#vDue");
+    if (dueEl) dueEl.textContent = dueN ? "今天该复习 " + dueN + " 个。" : "";
+    const qd = $("#qdDue");
+    if (qd) { qd.textContent = "今天该复习的（" + dueN + "）"; qd.disabled = dueN === 0; }
     const box = $("#vList");
     if (!all.length) {
       box.innerHTML = '<div class="vempty">生词本还是空的。去「⑤ 原文精读」里点几个词，查过的词会自动收进来。</div>';
@@ -483,6 +539,7 @@
           (it.src ? '<span class="vsrc">选自' + esc(it.src) + "</span>" : "") +
           (hits > 1 ? '<span class="vhits">查过 ' + hits + " 次</span>" : "") +
           (isFocus(it) && !it.star ? '<span class="vfocus">重点</span>' : "") +
+          (isDue(it) ? '<span class="vbadge">待复习</span>' : "") +
           "</div>" +
           (it.meaning ? '<div class="vmean">' + esc(it.meaning) + "</div>" : "") +
           (it.nuance ? '<div class="vnu">' + esc(it.nuance) + "</div>" : "") +
@@ -715,6 +772,7 @@
         options = shuffle([correct].concat(others.slice(0, 3).map(function (o) { return o.word; })));
       }
       return {
+        word: it.word,
         type: useEn ? "en2zh" : "zh2en",
         prompt: prompt, sub: sub,
         options: options.map(function (t) { return { t: t, ok: t === correct }; }),
@@ -770,17 +828,21 @@
       "(function(){",
       "var D = window.__DATA__;",
       "var app = document.getElementById('app');",
-      "var i = 0, score = 0, wrong = [];",
+      "var i = 0, score = 0, wrong = [], rightW = [], wrongW = [];",
       "function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }",
       "function tips(txt){ var t=document.getElementById('tip'); t.textContent=txt; t.className='tip show'; clearTimeout(tips._t); tips._t=setTimeout(function(){t.className='tip';},2200); }",
       "function done(){",
       "  var pct = Math.round(score / Math.max(1, D.items.length) * 100);",
       "  var rows = wrong.map(function(w){ return '<div class=\"wrong-item\"><b>'+esc(w.prompt)+'</b> → '+esc(w.answer)+'<br><span class=\"ex\">'+esc(w.sentence||'')+'</span></div>'; }).join('');",
+      "  var code = 'CET6Q1|' + wrongW.join(';') + '|' + rightW.join(';');",
       "  app.innerHTML = '<div class=\"card\"><div class=\"qno\">完成</div><div class=\"score\">'+score+' / '+D.items.length+'</div>'",
       "    + '<div class=\"sub\">正确率 '+pct+'%'+(wrong.length?' · 错 '+wrong.length+' 题':' · 全对')+'</div>'",
       "    + (rows ? '<h2>再错一次</h2>'+rows : '')",
-      "    + '<div class=\"nav\"><button class=\"btn\" id=\"again\">再来一轮</button></div></div>';",
-      "  document.getElementById('again').onclick = function(){ i=0; score=0; wrong=[]; render(); };",
+      "    + '<h2>结果码</h2><p class=\"sub\" style=\"margin:0 0 8px\">复制这段，回到「错题解剖台」的生词本，点「导入练习结果」</p>'",
+      "    + '<textarea readonly id=\"rc\" style=\"width:100%;min-height:70px;font-family:ui-monospace,Consolas,monospace;font-size:12px;border:1px solid #e6e2d9;border-radius:10px;padding:10px;background:#fdfcf9\">'+code+'</textarea>'",
+      "    + '<div class=\"nav\"><button class=\"btn p\" id=\"copyrc\">复制结果码</button><button class=\"btn\" id=\"again\">再来一轮</button></div></div>';",
+      "  document.getElementById('copyrc').onclick = function(){ var el=document.getElementById('rc'); el.select(); el.setSelectionRange(0,9999); try{ document.execCommand('copy'); tips('结果码已复制'); }catch(e){ tips('复制失败，长按手动复制'); } };",
+      "  document.getElementById('again').onclick = function(){ i=0; score=0; wrong=[]; rightW=[]; wrongW=[]; render(); };",
       "}",
       "function render(){",
       "  if (i >= D.items.length) return done();",
@@ -802,9 +864,10 @@
       "        else b.classList.add('dim');",
       "      });",
       "      var fb = document.getElementById('fb');",
-      "      if (ok) { score++; fb.innerHTML = '<div class=\"line\">✅ 对了'+(it.note?' · '+esc(it.note):'')+'</div>'; }",
+      "      if (ok) { score++; rightW.push(it.word); fb.innerHTML = '<div class=\"line\">✅ 对了'+(it.note?' · '+esc(it.note):'')+'</div>'; }",
       "      else {",
       "        var right = it.options.filter(function(o){return o.ok;})[0];",
+      "        wrongW.push(it.word);",
       "        wrong.push({prompt: it.prompt, answer: right.t, sentence: it.sentence});",
       "        fb.innerHTML = '<div class=\"line\">❌ 正确答案：<b>'+esc(right.t)+'</b>'+(it.note?' · '+esc(it.note):'')+'</div>'",
       "          + (it.sentence ? '<div class=\"line ex\">'+esc(it.sentence)+'<br>'+esc(it.sentenceZh||'')+'</div>' : '');",
@@ -885,7 +948,9 @@
   }
   function quizWords(scope) {
     const all = vocabAll();
-    const list = scope === "focus" ? all.filter(isFocus) : all;
+    let list = all;
+    if (scope === "focus") list = all.filter(isFocus);
+    else if (scope === "due") list = dueList();
     return list.filter(function (x) { return x.word && x.meaning; });
   }
   function downloadQuiz(data) {
@@ -1619,7 +1684,30 @@
   $("#vPdf").addEventListener("click", exportPDF);
   $("#vQuiz").addEventListener("click", function () {
     $("#qErr").className = "cfgerr";
+    const dueN = dueList().length;
+    const qd = $("#qdDue");
+    if (qd) { qd.textContent = "今天该复习的（" + dueN + "）"; qd.disabled = dueN === 0; }
     $("#ovQuiz").classList.add("show");
+  });
+  $("#vImport").addEventListener("click", function () {
+    $("#resErr").className = "cfgerr";
+    $("#resText").value = "";
+    $("#ovResult").classList.add("show");
+  });
+  $("#resClose").addEventListener("click", function () { $("#ovResult").classList.remove("show"); });
+  $("#resGo").addEventListener("click", function () {
+    const res = parseResultCode($("#resText").value);
+    const err = $("#resErr");
+    if (!res) {
+      err.className = "cfgerr show";
+      err.textContent = "这段不是有效的结果码（应该以 CET6Q1| 开头，形如 CET6Q1|错词;错词|对词）。";
+      return;
+    }
+    const n = applyQuizResult(res);
+    $("#ovResult").classList.remove("show");
+    renderVocab();
+    refreshWordMarks();
+    toast(n ? "已更新 " + n + " 个词" : "这段结果码里的词都不在生词本里");
   });
   $("#qClose").addEventListener("click", function () { $("#ovQuiz").classList.remove("show"); });
   $("#qGo").addEventListener("click", function () { runQuiz("download"); });
@@ -1696,6 +1784,12 @@
     renderVocab();
     if (!/[?&]vocabdemo=seed/.test(location.search)) $("#ovVocab").classList.add("show");
   }
+  if (/[?&]resultdemo=1/.test(location.search)) setTimeout(function () {
+    if (!vocabAll().length) seedDemoVocab();
+    applyQuizResult({ wrong: ["vehement"], right: ["influencer", "scrutiny"] });
+    renderVocab();
+    $("#ovVocab").classList.add("show");
+  }, 600);
   if (/[?&]quizdemo=/.test(location.search)) setTimeout(async function () {
     const mode = ((location.search.match(/quizdemo=(\w+)/) || [])[1]) || "words";
     if (!vocabAll().length) seedDemoVocab();
