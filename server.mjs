@@ -520,6 +520,20 @@ const server = http.createServer(async (req, res) => {
     return res.end(buf);
   }
 
+  if (u.pathname === "/api/find" && req.method === "GET") {
+    const w = String(u.searchParams.get("word") || "").trim().toLowerCase();
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    if (!w) return res.end(JSON.stringify([]));
+    const list = readJson(F_RECORDS, []);
+    const hits = list.filter(function (r) {
+      return String(r.article || "").toLowerCase().indexOf(w) >= 0 ||
+             String(r.analysis || "").toLowerCase().indexOf(w) >= 0;
+    }).map(function (r) {
+      return { id: r.id, title: r.title || "未命名", createdAt: r.createdAt };
+    }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    return res.end(JSON.stringify(hits));
+  }
+
   if (u.pathname === "/api/records") {
     const list = readJson(F_RECORDS, []);
     if (req.method === "GET") {

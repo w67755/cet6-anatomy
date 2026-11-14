@@ -488,6 +488,7 @@
           (it.nuance ? '<div class="vnu">' + esc(it.nuance) + "</div>" : "") +
           (it.sentence ? '<div class="vex">' + esc(it.sentence) + "</div>" : "") +
           (it.sentenceZh ? '<div class="vzh">' + esc(it.sentenceZh) + "</div>" : "") +
+          '<div class="vlinks"></div>' +
         "</div>" +
         '<button class="vstar' + (it.star ? " on" : "") + '" title="' + (it.star ? "取消标记" : "手动标记为重点") + '">' + (it.star ? "★" : "☆") + "</button>" +
         '<button class="vdel" title="删除">×</button></div>';
@@ -495,6 +496,10 @@
 
     Array.from(box.querySelectorAll(".vrow")).forEach(function (row) {
       const word = row.dataset.word;
+      row.querySelector(".vmain").addEventListener("click", function (e) {
+        if (e.target.closest(".vlink")) return;
+        openArticleFor(word, row);
+      });
       row.querySelector(".vstar").addEventListener("click", function () {
         const arr = vocabAll();
         const i = arr.findIndex(function (x) { return String(x.word).toLowerCase() === String(word).toLowerCase(); });
@@ -510,6 +515,61 @@
         refreshWordMarks();
       });
     });
+  }
+
+  async function openArticleFor(word, row) {
+    const box = row.querySelector(".vlinks");
+    if (!box) return;
+    if (box.dataset.open === "1") {
+      box.innerHTML = "";
+      box.dataset.open = "";
+      return;
+    }
+    box.dataset.open = "1";
+    box.innerHTML = '<div class="vlink hint">查找中…</div>';
+    let list = [];
+    try {
+      list = await api("/api/find?word=" + encodeURIComponent(word));
+    } catch (e) {
+      box.innerHTML = '<div class="vlink err">查找失败：' + esc(e.message) + "</div>";
+      return;
+    }
+    if (!list || !list.length) {
+      box.innerHTML = '<div class="vlink err">找不到这篇文章：可能已经被删除，或者这个词是示例数据。</div>';
+      return;
+    }
+    if (list.length === 1) return gotoRecord(list[0].id, word);
+    box.innerHTML = '<div class="vlink hint">这个词出现在 ' + list.length + ' 篇文章里，点一个跳过去：</div>' +
+      list.map(function (r) {
+        return '<button class="vlink" data-id="' + r.id + '">' + esc(r.title) + " · " +
+          new Date(r.createdAt || Date.now()).toLocaleDateString("zh-CN") + "</button>";
+      }).join("");
+    Array.from(box.querySelectorAll("button.vlink")).forEach(function (b) {
+      b.addEventListener("click", function (ev) { ev.stopPropagation(); gotoRecord(b.dataset.id, word); });
+    });
+  }
+
+  async function gotoRecord(id, word) {
+    $("#ovVocab").classList.remove("show");
+    try {
+      await loadRecord(id);
+    } catch (e) {
+      return toast("打开失败：" + e.message);
+    }
+    setTimeout(function () { jumpToWord(word); }, 450);
+  }
+
+  function jumpToWord(word) {
+    const el = Array.from(document.querySelectorAll("#reading .w"));
+    const key = stemKey(word);
+    const hit = el.find(function (x) {
+      const t = String(x.textContent).toLowerCase();
+      return t === key || stemKey(t) === key || t === String(word).toLowerCase();
+    });
+    if (!hit) return toast("文章里没找到这个词，可能已被改写");
+    hit.scrollIntoView({ block: "center" });
+    hit.classList.add("w-jump");
+    setTimeout(function () { hit.classList.remove("w-jump"); }, 2600);
   }
 
   function vocabSelected() {
@@ -1329,6 +1389,11 @@
     if (!/[?&]vocabdemo=seed/.test(location.search)) $("#ovVocab").classList.add("show");
   }
   if (/[?&]historydemo=1/.test(location.search)) setTimeout(openHistory, 400);
+  if (/[?&]expand=/.test(location.search)) setTimeout(function () {
+    const n = Number((location.search.match(/[?&]expand=(\d+)/) || [])[1] || 1) - 1;
+    const row = document.querySelectorAll("#vList .vrow")[n];
+    if (row) row.querySelector(".vmain").click();
+  }, 900);
   if (/[?&]dictdemo=1/.test(location.search)) setTimeout(function () {
     const w = document.querySelector("#reading .w");
     if (!w || !window.__dict) return;
