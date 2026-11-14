@@ -1107,8 +1107,9 @@
     const el = document.createElement("div");
     el.className = "q";
     el.dataset.id = "q" + qSeq;
+    if (q && q.no) el.dataset.no = String(q.no);
     el.innerHTML =
-      '<div class="qhead"><div class="no">' + qSeq + '</div>' +
+      '<div class="qhead"><div class="no">' + (q && q.no ? q.no : qSeq) + '</div>' +
       '<input type="text" class="stem" placeholder="题干 / Question stem">' +
       '<button class="del" title="删除">×</button></div>' +
       '<div class="opts">' +
@@ -1137,7 +1138,7 @@
   }
   function renumber() {
     Array.from(els.qlist.children).forEach(function (el, i) {
-      el.querySelector(".no").textContent = String(i + 1);
+      el.querySelector(".no").textContent = el.dataset.no || String(i + 1);
     });
     qSeq = els.qlist.children.length;
   }
@@ -1149,7 +1150,7 @@
         o[k] = inp ? inp.value.trim() : "";
       });
       return {
-        no: i + 1,
+        no: el.dataset.no || (i + 1),
         stem: el.querySelector(".stem").value.trim(),
         options: o,
         my: el.querySelector(".my").value,
@@ -1275,6 +1276,16 @@
     if (txt) els.runhint.textContent = txt;
   }
 
+  function normalizeAnswers(text) {
+    const src = String(text || "").trim();
+    if (!src) return "";
+    const pairs = [];
+    const re = /(\d{1,3})\s*[-—:：.、]?\s*([A-Da-d])\b/g;
+    let m;
+    while ((m = re.exec(src)) !== null) pairs.push(m[1] + " → " + m[2].toUpperCase());
+    return pairs.length ? pairs.join("，") : src;
+  }
+
   async function analyze() {
     const article = els.article.value.trim();
     const questions = collect();
@@ -1289,7 +1300,7 @@
     try {
       const r = await stream("/api/analyze", {
         article: article, questions: questions, images: images,
-        myAnswers: ($("#myAns") && $("#myAns").value.trim()) || "",
+        myAnswers: normalizeAnswers($("#myAns") && $("#myAns").value),
       }, function (t) {
         acc = t;
         $("#result").innerHTML = md(acc);
