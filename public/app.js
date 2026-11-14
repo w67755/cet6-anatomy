@@ -119,6 +119,12 @@
       } catch (e) { toast("有一张没能读取：" + e.message); }
     }
     renderThumbs();
+    const hasOld = els.article.value.trim().length > 0 || collect().some(function (q) { return q.stem; });
+    if (hasOld) {
+      const ok = await confirmBox("来了新的照片", "输入区里还有上一份的文章 / 题目。清空它们，只分析这批新照片？");
+      if (ok) { resetWorkbench({ keepImages: true }); return; }
+    }
+    mixedCheck();
   }
 
   function resetWorkbench(opts) {
@@ -143,6 +149,7 @@
     if (els.msgs) els.msgs.innerHTML = "";
     setReading("");
     const banner = $("#mixedWarn"); if (banner) banner.hidden = true;
+    Array.from(document.querySelectorAll(".overlay.show")).forEach(function (o) { o.classList.remove("show"); });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -2085,12 +2092,13 @@
     if (!/[?&]vocabdemo=seed/.test(location.search)) $("#ovVocab").classList.add("show");
   }
   if (/[?&]resetdemo=1/.test(location.search)) setTimeout(function () { resetWorkbench(); }, 1500);
-  if (/[?&]afterimg=1/.test(location.search)) setTimeout(function () {
+  if (/[?&]afterimg=1/.test(location.search)) setTimeout(async function () {
+    if (/[?&]hist=1/.test(location.search)) { $("#ovHistory").classList.add("show"); }
     const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-    state.images = [{ name: "new-page.jpg", dataUrl: png, w: 1, h: 1, kb: 1 }];
-    renderThumbs();
-    mixedCheck();
-  }, 1300);
+    const blob = await (await fetch(png)).blob();
+    const f = new File([blob], "new-page.png", { type: "image/png" });
+    addImages([f]);
+  }, 1400);
   if (/[?&]imgdemo=1/.test(location.search)) setTimeout(function () {
     const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
     state.images = [{ name: "demo1.jpg", dataUrl: png, w: 1, h: 1, kb: 1 }, { name: "demo2.jpg", dataUrl: png, w: 1, h: 1, kb: 1 }];
