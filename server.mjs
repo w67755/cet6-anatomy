@@ -109,17 +109,52 @@ const SPLIT_SYSTEM = [
   "你是六级试卷的排版分析员。输入是一整套试卷的照片（可能包含多篇阅读）。",
   "任务：把阅读文章按「篇」切开，逐篇转录。",
   "要求：",
-  "1. 每篇包含：标题（没有就用 Passage N 或首句前六个词）、完整正文、紧随其后的题目（题干 + A/B/C/D 四个选项）。",
+  "1. 每篇包含：标题（没有就用 Passage N 或首句前六个词）、完整正文、紧随其后的题目。",
+  "2. 判断每篇的题型：仔细阅读 type=\"mcq\"（题干 + A/B/C/D 四个选项）；长篇阅读·段落匹配 type=\"match\"（文章按 A) B) … 分段，题干没有选项，答案是段落字母）。",
   "2. 只做切分与转录，不要分析、不要翻译、不要总结。",
   "3. 图片看不清的地方写 [不清]，不要猜。",
   "4. 如果只有一篇，数组里就一项。",
   "5. 只输出 JSON，不要解释、不要代码块围栏：",
-  '{"passages":[{"title":"…","article":"正文，段落之间空一行","questions":[{"no":"21","stem":"…","options":{"A":"…","B":"…","C":"…","D":"…"},"my":"A-D 或空","answer":"A-D 或空"}]}]}',
+  '{"passages":[{"title":"…","type":"mcq|match","article":"正文，段落之间空一行","questions":[{"no":"21","stem":"…","options":{"A":"…","B":"…","C":"…","D":"…"},"my":"A-D 或空","answer":"A-D 或空"}]}]}',
+  "6. 段落匹配的题目写成：{\"no\":\"36\",\"stem\":\"…\",\"answer\":\"D\",\"my\":\"\"}，不要填 options。",
+].join("\n");
+
+const MATCH_PROMPT = [
+  "你是一位专攻中国大学英语六级阅读的精讲老师，擅长「长篇阅读 / 段落匹配」。",
+  "",
+  "【题型说明】",
+  "文章被分成 A–O 若干段，题乾是 10 个陈述句（36–45 题）。每题对应一个段落字母；同一个段落可能被用两次，也可能有段落完全用不到。",
+  "",
+  "【分析原则】",
+  "1. 先建立段落地图：逐段用一句话概括，标出该段的标志性关键词。",
+  "2. 每题必须走完：题干关键词（尤其是同义替换点）→ 2 个候选段落 → 最终段落与理由 → 该段关键句（原文引用 + 中文直译）→ 干扰段为什么像但不是。",
+  "3. 题号一律用原卷题号（36–45）；段落字母用大写。",
+  "4. 不要编造原文没有的句子；定位不到就写“未找到明确对应段”。",
+  "",
+  "【输出格式（Markdown）】",
+  "## 一、段落地图",
+  "表格：段落 | 一句话概括（中文） | 关键词（英文）",
+  "## 二、逐题定位",
+  "每题一个 ###，依次写：",
+  "- **题干关键词**：句子里最关键的 2–3 个词，以及它在原文里可能被替换成什么",
+  "- **候选**：先列 2 个看起来都对的段落，各用一句话说明像在哪",
+  "- **定位段落**：**X**",
+  "- **关键句**：> 原文（加粗关键词）｜中文直译",
+  "- **为什么不是另一段**：一句话点破区别",
+  "- **一句话记住**：不超过 40 字",
+  "## 三、共性诊断",
+  "- 这几题暴露的固定毛病 + 3 条可执行的动作",
+  "## 四、生词与短语",
+  "表格：词/短语 | 释义 | 原文搭配",
 ].join("\n");
 
 function questionBlock(qs) {
   return (qs || []).map((q, i) => {
     const no = q.no || i + 1;
+    if (q.type === "match") {
+      return "第" + no + "题（段落匹配）" + (q.stem || "") +
+        "\n我的答案：段落" + (q.my || "未填") + "\n正确答案：段落" + (q.correct || "未知（请你自己判断）");
+    }
     const opts = ["A", "B", "C", "D"].map((k) => k + ") " + ((q.options && q.options[k]) || "")).join("\n");
     return no + ". " + (q.stem || "") + "\n" + opts +
       "\n我的答案：" + (q.my || "未填") + "\n正确答案：" + (q.correct || "未知（请你自己判断并给出正确答案）");
@@ -435,8 +470,9 @@ const server = http.createServer(async (req, res) => {
         })))
       : textParts.join("\n\n");
 
+    const basePrompt = String(b.kind || "") === "match" ? MATCH_PROMPT : SYSTEM_PROMPT;
     const messages = [
-      { role: "system", content: SYSTEM_PROMPT + (images.length ? "\n" + VISION_NOTE : "") },
+      { role: "system", content: basePrompt + (images.length ? "\n" + VISION_NOTE : "") },
       { role: "user", content: userContent },
     ];
     return streamUpstream(res, messages, cfg);
@@ -499,8 +535,15 @@ const server = http.createServer(async (req, res) => {
       if (!data) return reply({ error: "解析失败：" + cleaned.slice(0, 120) }, 502);
       const list = (Array.isArray(data.passages) ? data.passages : []).slice(0, 8).map((p) => ({
         title: String(p.title || "未命名").slice(0, 60),
+        type: String(p.type || "").toLowerCase() === "match" ? "match" : "mcq",
         article: String(p.article || ""),
-        questions: Array.isArray(p.questions) ? p.questions : [],
+        questions: (Array.isArray(p.questions) ? p.questions : []).map((q) => ({
+          no: String(q.no || ""),
+          stem: String(q.stem || ""),
+          options: q.options || {},
+          my: String(q.my || ""),
+          answer: String(q.answer || ""),
+        })),
       })).filter((p) => p.article || p.questions.length);
       if (!list.length) return reply({ error: "没识别出任何文章" }, 502);
       return reply({ passages: list });

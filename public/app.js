@@ -7,7 +7,7 @@
     msgs: $("#msgs"), ask: $("#ask"), dot: $("#dot"), runhint: $("#runhint"),
   };
 
-  const state = { questions: [], analysis: "", chat: [], recordId: null, recordTitle: "", busy: false, images: [], reading: [] };
+  const state = { questions: [], analysis: "", chat: [], recordId: null, recordTitle: "", busy: false, images: [], reading: [], kind: "mcq" };
   const cfg = { baseUrl: "", model: "", hasKey: false };
 
   /* ---------------- utils ---------------- */
@@ -973,7 +973,7 @@
       return '<label class="rrow" style="cursor:pointer">' +
         '<input type="checkbox" class="spchk" data-i="' + i + '" checked style="margin-top:4px">' +
         '<div class="rmain"><b>' + esc(p.title) + "</b>" +
-        "<small>" + words + " 词 · " + (p.questions || []).length + " 题</small>" +
+        "<small>" + words + " 词 · " + (p.questions || []).length + " 题 · " + (p.type === "match" ? "段落匹配" : "仔细阅读") + "</small>" +
         '<div class="vzh" style="margin-top:4px">' + esc(String(p.article || "").slice(0, 90)) + "…</div></div></label>";
     }).join("");
   }
@@ -990,6 +990,7 @@
           article: p.article || "",
           questions: (p.questions || []).map(function (q, i) {
             return {
+              type: p.type || "mcq",
               no: q.no || i + 1,
               stem: q.stem || "",
               options: q.options || {},
@@ -1108,28 +1109,45 @@
     el.className = "q";
     el.dataset.id = "q" + qSeq;
     if (q && q.no) el.dataset.no = String(q.no);
-    el.innerHTML =
-      '<div class="qhead"><div class="no">' + (q && q.no ? q.no : qSeq) + '</div>' +
-      '<input type="text" class="stem" placeholder="题干 / Question stem">' +
-      '<button class="del" title="删除">×</button></div>' +
-      '<div class="opts">' +
-      ["A", "B", "C", "D"].map(function (k) {
-        return '<div class="opt"><i>' + k + '</i><input type="text" data-k="' + k + '" placeholder="选项 ' + k + '"></div>';
-      }).join("") +
-      '</div>' +
-      '<div class="ansrow"><span>我选</span><select class="my"><option value="">—</option>' +
-      ["A", "B", "C", "D"].map(function (k) { return '<option value="' + k + '">' + k + '</option>'; }).join("") +
-      '</select><span>正确答案</span><select class="correct"><option value="">未知</option>' +
-      ["A", "B", "C", "D"].map(function (k) { return '<option value="' + k + '">' + k + '</option>'; }).join("") +
-      '</select><span class="hint" style="margin-left:auto">不知道答案就留空</span></div>';
+    const isMatch = (q && q.type) === "match" || (!q && state.kind === "match");
+    el.dataset.type = isMatch ? "match" : "mcq";
+    if (isMatch) {
+      el.innerHTML =
+        '<div class="qhead"><div class="no">' + (q && q.no ? q.no : qSeq) + '</div>' +
+        '<input type="text" class="stem" placeholder="题干 / Statement">' +
+        '<button class="del" title="删除">×</button></div>' +
+        '<div class="ansrow"><span>我选</span><input class="mypick" maxlength="2" placeholder="—">' +
+        '<span>正确答案</span><input class="corpick" maxlength="2" placeholder="—">' +
+        '<span class="hint" style="margin-left:auto">填段落字母，如 C</span></div>';
+    } else {
+      el.innerHTML =
+        '<div class="qhead"><div class="no">' + (q && q.no ? q.no : qSeq) + '</div>' +
+        '<input type="text" class="stem" placeholder="题干 / Question stem">' +
+        '<button class="del" title="删除">×</button></div>' +
+        '<div class="opts">' +
+        ["A", "B", "C", "D"].map(function (k) {
+          return '<div class="opt"><i>' + k + '</i><input type="text" data-k="' + k + '" placeholder="选项 ' + k + '"></div>';
+        }).join("") +
+        '</div>' +
+        '<div class="ansrow"><span>我选</span><select class="my"><option value="">—</option>' +
+        ["A", "B", "C", "D"].map(function (k) { return '<option value="' + k + '">' + k + '</option>'; }).join("") +
+        '</select><span>正确答案</span><select class="correct"><option value="">未知</option>' +
+        ["A", "B", "C", "D"].map(function (k) { return '<option value="' + k + '">' + k + '</option>'; }).join("") +
+        '</select><span class="hint" style="margin-left:auto">不知道答案就留空</span></div>';
+    }
     els.qlist.appendChild(el);
     el.querySelector(".stem").value = q.stem || "";
-    ["A", "B", "C", "D"].forEach(function (k) {
-      const inp = el.querySelector('input[data-k="' + k + '"]');
-      if (inp) inp.value = (q.options && q.options[k]) || "";
-    });
-    el.querySelector(".my").value = q.my || "";
-    el.querySelector(".correct").value = q.correct || "";
+    if (isMatch) {
+      el.querySelector(".mypick").value = q.my || "";
+      el.querySelector(".corpick").value = q.correct || "";
+    } else {
+      ["A", "B", "C", "D"].forEach(function (k) {
+        const inp = el.querySelector('input[data-k="' + k + '"]');
+        if (inp) inp.value = (q.options && q.options[k]) || "";
+      });
+      el.querySelector(".my").value = q.my || "";
+      el.querySelector(".correct").value = q.correct || "";
+    }
     el.querySelector(".del").addEventListener("click", function () {
       el.remove(); renumber();
       if (!els.qlist.children.length) addQuestion();
@@ -1144,19 +1162,33 @@
   }
   function collect() {
     return Array.from(els.qlist.children).map(function (el, i) {
+      const type = el.dataset.type === "match" ? "match" : "mcq";
+      if (type === "match") {
+        const mp = el.querySelector(".mypick");
+        const cp = el.querySelector(".corpick");
+        return {
+          type: "match",
+          no: el.dataset.no || (i + 1),
+          stem: el.querySelector(".stem").value.trim(),
+          options: {},
+          my: (mp ? mp.value : "").trim().toUpperCase(),
+          correct: (cp ? cp.value : "").trim().toUpperCase(),
+        };
+      }
       const o = {};
       ["A", "B", "C", "D"].forEach(function (k) {
         const inp = el.querySelector('input[data-k="' + k + '"]');
         o[k] = inp ? inp.value.trim() : "";
       });
       return {
+        type: "mcq",
         no: el.dataset.no || (i + 1),
         stem: el.querySelector(".stem").value.trim(),
         options: o,
         my: el.querySelector(".my").value,
         correct: el.querySelector(".correct").value,
       };
-    }).filter(function (q) { return q.stem || q.options.A; });
+    }).filter(function (q) { return q.stem || (q.options && q.options.A); });
   }
 
   /* ---------------- records ---------------- */
@@ -1298,8 +1330,9 @@
     setBusy(true, images.length ? "正在读图、定位，通常要 30–90 秒…" : "正在逐段比对，请稍候…");
     let acc = "";
     try {
+      const kind = questions.some(function (q) { return q.type === "match"; }) ? "match" : "mcq";
       const r = await stream("/api/analyze", {
-        article: article, questions: questions, images: images,
+        kind: kind, article: article, questions: questions, images: images,
         myAnswers: normalizeAnswers($("#myAns") && $("#myAns").value),
       }, function (t) {
         acc = t;
@@ -1683,6 +1716,9 @@
       els.article.value = rec.article || "";
       updateWc();
       if (clearImages()) toast("已清空上一批照片：这条记录用转录的文字解剖，不会再读图");
+      const recKind = (rec.questions || []).some(function (q) { return q && q.type === "match"; }) ? "match" : "mcq";
+      state.kind = recKind;
+      const ksel = $("#qkind"); if (ksel) ksel.value = recKind;
       els.qlist.innerHTML = ""; qSeq = 0;
       (rec.questions || []).forEach(addQuestion);
       if (!els.qlist.children.length) addQuestion();
@@ -1753,6 +1789,21 @@
     if (files.length) { e.preventDefault(); addImages(files); toast("已粘贴 " + files.length + " 张图"); }
   });
   $("#addQ").addEventListener("click", function () { addQuestion(); });
+  $("#qkind").addEventListener("change", async function (e) {
+    const kind = e.target.value;
+    const old = collect();
+    if (old.length && old.some(function (q) { return q.stem; })) {
+      const ok = await confirmBox("切换题型", "会把现有 " + old.length + " 道题重建成「" + (kind === "match" ? "段落匹配" : "仔细阅读") + "」，选项内容会丢失。");
+      if (!ok) { e.target.value = state.kind; return; }
+    }
+    state.kind = kind;
+    els.qlist.innerHTML = ""; qSeq = 0;
+    if (old.length) {
+      old.forEach(function (q) {
+        addQuestion({ type: kind, no: q.no, stem: q.stem, my: q.my, correct: q.correct, options: kind === "mcq" ? q.options : {} });
+      });
+    } else addQuestion();
+  });
   $("#analyze").addEventListener("click", analyze);
   $("#recDetach").addEventListener("click", function () {
     state.recordId = null;
