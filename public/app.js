@@ -531,7 +531,10 @@
     try {
       list = await api("/api/find?word=" + encodeURIComponent(word));
     } catch (e) {
-      box.innerHTML = '<div class="vlink err">查找失败：' + esc(e.message) + "</div>";
+      const msg = String((e && e.message) || e);
+      box.innerHTML = msg.indexOf("404") >= 0
+        ? '<div class="vlink err">本地服务还是旧版本，没有「跳转原文」这个接口。<br>关掉那个黑窗口，重新双击 <b>启动.bat</b> 再试。</div>'
+        : '<div class="vlink err">查找失败：' + esc(msg) + "</div>";
       return;
     }
     if (!list || !list.length) {
