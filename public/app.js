@@ -1496,6 +1496,77 @@
       .map(function (r) { return r.dataset.id; });
   }
 
+  async function exportBackup() {
+    try {
+      const r = await api("/api/backup");
+      const payload = {
+        kind: "cet6-anatomy-backup",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        vocab: vocabAll(),
+        records: (r && r.records) || [],
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+      downloadBlob(blob, "六级备份-" + stamp() + ".json");
+      toast("已备份：" + payload.vocab.length + " 个词 · " + payload.records.length + " 条记录");
+    } catch (e) {
+      toast("备份失败：" + e.message);
+    }
+  }
+
+  async function restoreBackup(file) {
+    if (!file) return;
+    let data = null;
+    try {
+      data = JSON.parse(await file.text());
+    } catch (e) {
+      return toast("这个文件不是合法的 JSON");
+    }
+    if (!data || data.kind !== "cet6-anatomy-backup") return toast("不是本工具的备份文件");
+    const inVocab = Array.isArray(data.vocab) ? data.vocab : [];
+    const inRecords = Array.isArray(data.records) ? data.records : [];
+
+    // 生词：按词合并，取更“熟”的那份数据
+    const local = vocabAll();
+    const map = {};
+    local.forEach(function (x) { map[String(x.word).toLowerCase()] = x; });
+    let newWords = 0;
+    inVocab.forEach(function (x) {
+      if (!x || !x.word) return;
+      const k = String(x.word).toLowerCase();
+      const cur = map[k];
+      if (!cur) { map[k] = x; newWords++; return; }
+      map[k] = {
+        word: cur.word, ipa: cur.ipa || x.ipa, pos: cur.pos || x.pos,
+        meaning: cur.meaning || x.meaning, nuance: cur.nuance || x.nuance,
+        sentence: cur.sentence || x.sentence, sentenceZh: cur.sentenceZh || x.sentenceZh,
+        src: cur.src || x.src,
+        hits: Math.max(cur.hits || 1, x.hits || 1),
+        star: !!(cur.star || x.star),
+        box: Math.max(cur.box || 0, x.box || 0),
+        due: Math.min(cur.due || Date.now(), x.due || Date.now()),
+        last: Math.max(cur.last || 0, x.last || 0),
+        at: Math.min(cur.at || Date.now(), x.at || Date.now()),
+      };
+    });
+    const merged = Object.keys(map).map(function (k) { return map[k]; });
+    vocabSave(merged);
+
+    let added = 0;
+    if (inRecords.length) {
+      try {
+        const r = await api("/api/backup/import", { records: inRecords });
+        added = (r && r.added) || 0;
+      } catch (e) {
+        return toast("记录恢复失败：" + e.message + "（生词已合并）");
+      }
+    }
+    renderVocab();
+    refreshWordMarks();
+    if ($("#ovHistory").classList.contains("show")) openHistory();
+    toast("已恢复：新增 " + newWords + " 个词 · " + added + " 条记录");
+  }
+
   async function importMarkdown(file) {
     if (!file) return;
     let text = "";
@@ -1610,6 +1681,12 @@
     if (!ids.length) return toast("先勾选要删除的记录");
     if (!(await confirmBox("删除选中的记录", "将删除 " + ids.length + " 条记录，无法恢复。"))) return;
     await deleteRecords(ids);
+  });
+  $("#btnBackup").addEventListener("click", exportBackup);
+  $("#fileRestore").addEventListener("change", function (e) {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    restoreBackup(f);
   });
   $("#mdImport").addEventListener("change", function (e) {
     const f = e.target.files && e.target.files[0];

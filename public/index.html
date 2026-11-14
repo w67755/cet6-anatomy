@@ -398,6 +398,8 @@
     <div class="sub">每次解剖会自动存一份，点开可以重新载入当时的文章、题目和报告。也可以手动导入之前的 .md 报告。</div>
     <div class="vtools" style="margin-bottom:12px">
       <label class="btn ghost sm">导入 .md 报告<input type="file" id="mdImport" accept=".md,.markdown,.txt" hidden></label>
+      <button class="btn ghost sm" id="btnBackup">备份全部</button>
+      <label class="btn ghost sm">恢复备份<input type="file" id="fileRestore" accept=".json" hidden></label>
       <span class="hint" style="align-self:center">支持「③ 解剖报告」里导出的文件</span>
     </div>
     <div class="vtools" id="recTools" style="display:none">
