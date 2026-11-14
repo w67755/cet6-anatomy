@@ -57,6 +57,10 @@
   .qopt{display:flex;gap:8px;align-items:flex-start;padding:9px 11px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:pointer;font-size:13.5px;line-height:1.6}
   .qopt:hover{border-color:#c9d3de;background:#fafbfc}
   .qopt input{margin-top:4px;accent-color:#1c4f82}
+  .previewWrap{width:min(920px,100%);height:min(92vh,1040px);background:#fff;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.28)}
+  .previewBar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:#fff}
+  .previewBar b{font-size:14px}
+  .previewFrame{flex:1;width:100%;border:0;background:#f4f2ed}
   .cfgerr.ok{background:#eef7f1;border-color:#cfe8da;color:#1c7a4a}
   .banner a{color:#8a2018;text-decoration:underline}
   /* ---------- layout ---------- */
@@ -463,8 +467,22 @@ D) The influencer industry has grown to about $250 billion by now."></textarea>
     <div class="cfgerr" id="qErr"></div>
     <div class="foot">
       <button class="btn ghost" id="qClose">取消</button>
+      <button class="btn" id="qPreview">先预览</button>
       <button class="btn primary" id="qGo">生成并下载</button>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovPreview" style="padding:14px">
+  <div class="previewWrap">
+    <div class="previewBar">
+      <b>预览</b>
+      <span class="hint">可以直接试做，确认没问题再下载</span>
+      <span style="flex:1"></span>
+      <button class="btn ghost sm" id="pvClose">关闭</button>
+      <button class="btn primary sm" id="pvDownload">下载 .html</button>
+    </div>
+    <iframe id="quizFrame" class="previewFrame" title="练习册预览"></iframe>
   </div>
 </div>
 
