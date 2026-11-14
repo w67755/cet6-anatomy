@@ -753,6 +753,21 @@
     return out;
   }
 
+  async function saveToNotebook() {
+    const article = els.article.value.trim();
+    const questions = collect();
+    if (!article && !questions.length) return toast("先填文章或题目，再存");
+    try {
+      const r = await api("/api/records", {
+        id: state.recordId,
+        title: questions.length ? (questions[0].stem.slice(0, 28) || "未命名") : (article.slice(0, 24) || "未命名"),
+        article: article, questions: questions, analysis: state.analysis, chat: state.chat,
+      });
+      if (r && r.id) state.recordId = r.id;
+      toast("已存进错题本");
+    } catch (e) { toast("保存失败：" + e.message); }
+  }
+
   /* ---------------- demo ---------------- */
   const DEMO_ARTICLE = "Influencers—the (usually female) people behind the most popular accounts on Instagram, TikTok and YouTube—have large followings, often in the hundreds of thousands or millions. According to Forbes, more than 50m people globally describe themselves as influencers; Goldman Sachs predicts the industry will double to nearly $500bn by 2027.\n\n" +
     "Though they shape digital culture, influencers are too often dismissed as fame-hungry pseudo-celebrities, who post about the minutiae of their lives and mindlessly promote branded products for eye-watering sums. But a new crop of books takes the influencer industry more seriously by exploring the way social media's most popular users are reshaping the global economy and changing what the average person views online.\n\n" +
@@ -858,7 +873,11 @@
     box.innerHTML = '<p class="hint">加载中…</p>';
     try {
       const list = await api("/api/records");
-      if (!list.length) { box.innerHTML = '<p class="hint">还没有记录。</p>'; return; }
+      if (!list.length) {
+        box.innerHTML = '<div class="vempty">还没有记录。<br>跑完一次「开始解剖」会自动存一份；<br>' +
+          '只生成了提示词（没配 Key）时不会存档，可以点左边「只存到错题本」手动存。</div>';
+        return;
+      }
       box.innerHTML = list.map(function (r) {
         const d = new Date(r.createdAt || Date.now());
         return '<div class="rec" data-id="' + r.id + '"><b>' + esc(r.title || "未命名") + "</b>" +
@@ -944,6 +963,7 @@
   });
   $("#addQ").addEventListener("click", function () { addQuestion(); });
   $("#analyze").addEventListener("click", analyze);
+  $("#saveRec").addEventListener("click", saveToNotebook);
   $("#send").addEventListener("click", send);
   els.ask.addEventListener("keydown", function (e) {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); }
