@@ -1048,7 +1048,13 @@
     const txt = await res.text();
     let data = null;
     try { data = JSON.parse(txt); } catch (e) { data = { error: txt }; }
-    if (!res.ok) throw new Error((data && data.error) || ("HTTP " + res.status));
+    if (!res.ok) {
+      const body = String((data && data.error) || txt || "").trim();
+      if (res.status === 404 && /^not found$/i.test(body)) {
+        throw new Error("本地服务是旧版本，还没有这个接口。关掉那个黑窗口，重新双击 启动.bat 再试。");
+      }
+      throw new Error(body || ("HTTP " + res.status));
+    }
     return data;
   }
 
