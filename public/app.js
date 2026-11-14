@@ -179,6 +179,7 @@
   }
 
   function wordify(text) {
+    const idx = vocabIndex();
     const re = /([A-Za-z][A-Za-z'’\-]*)/g;
     let out = "", last = 0, m;
     const gap = function (str, off) {
@@ -186,7 +187,9 @@
     };
     while ((m = re.exec(text)) !== null) {
       out += gap(text.slice(last, m.index), last);
-      out += '<span class="w" data-i="' + m.index + '">' + esc(m[1]) + "</span>";
+      const hit = vocabLookup(idx, m[1]);
+      const cls = "w" + (hit ? (isFocus(hit) ? " w-known w-focus" : " w-known") : "");
+      out += '<span class="' + cls + '" data-i="' + m.index + '">' + esc(m[1]) + "</span>";
       last = m.index + m[1].length;
     }
     out += gap(text.slice(last), last);
@@ -217,6 +220,15 @@
       if (!q || (!q.stem && !(q.options && q.options.A))) return null;
       return { no: String(q.no || i + 1), stem: q.stem || "", opts: q.options || {}, my: q.my || "", ans: q.correct || "" };
     }).filter(Boolean);
+  }
+
+  function refreshWordMarks() {
+    const idx = vocabIndex();
+    Array.from(document.querySelectorAll("#reading .w")).forEach(function (el) {
+      const hit = vocabLookup(idx, el.textContent);
+      el.classList.toggle("w-known", !!hit);
+      el.classList.toggle("w-focus", !!(hit && isFocus(hit)));
+    });
   }
 
   function setReading(text, qs) {
@@ -391,17 +403,49 @@
   function vocabAdd(item) {
     if (!item || !item.word) return;
     const list = vocabAll();
-    const i = list.findIndex(function (x) { return String(x.word).toLowerCase() === String(item.word).toLowerCase(); });
+    const key = String(item.word).toLowerCase();
+    const i = list.findIndex(function (x) { return String(x.word).toLowerCase() === key; });
+    const prev = i >= 0 ? list[i] : null;
     const rec = {
       word: item.word, ipa: item.ipa || "", pos: item.pos || "", meaning: item.meaning || "",
       nuance: item.nuance || "", sentence: item.sentence || "", sentenceZh: item.sentenceZh || "",
-      src: item.src || (list[i] && list[i].src) || "",
+      src: item.src || (prev && prev.src) || "",
+      hits: prev ? (prev.hits || 1) + 1 : 1,
+      star: prev ? !!prev.star : false,
       at: Date.now(),
     };
-    if (i >= 0) list[i] = Object.assign({}, list[i], rec);
-    else list.unshift(rec);
+    if (i >= 0) list[i] = rec; else list.unshift(rec);
     vocabSave(list);
+    refreshWordMarks();
   }
+
+  function isFocus(it) { return !!(it && (it.star || (it.hits || 1) >= 2)); }
+
+  function stemKey(w) {
+    w = String(w || "").toLowerCase().trim();
+    if (w.length > 4 && w.slice(-3) === "ies") return w.slice(0, -3) + "y";
+    if (w.length > 5 && w.slice(-3) === "ing") return w.slice(0, -3);
+    if (w.length > 4 && w.slice(-2) === "es") return w.slice(0, -2);
+    if (w.length > 4 && w.slice(-2) === "ed") return w.slice(0, -2);
+    if (w.length > 3 && w.slice(-1) === "s" && w.slice(-2) !== "ss") return w.slice(0, -1);
+    return w;
+  }
+
+  function vocabIndex() {
+    const map = {};
+    vocabAll().forEach(function (x) {
+      const w = String(x.word || "").toLowerCase();
+      map[w] = x;
+      map[stemKey(w)] = x;
+    });
+    return map;
+  }
+
+  function vocabLookup(map, token) {
+    const t = String(token || "").toLowerCase();
+    return map[t] || map[stemKey(t)] || null;
+  }
+
   function vocabTouch(word) {
     const list = vocabAll();
     const i = list.findIndex(function (x) { return String(x.word).toLowerCase() === String(word).toLowerCase(); });
@@ -412,34 +456,58 @@
   }
 
   function renderVocab() {
-    const list = vocabAll();
-    vocabSave(list);
+    const all = vocabAll();
+    vocabSave(all);
     const box = $("#vList");
-    if (!list.length) {
+    if (!all.length) {
       box.innerHTML = '<div class="vempty">生词本还是空的。去「⑤ 原文精读」里点几个词，查过的词会自动收进来。</div>';
       return;
     }
-    box.innerHTML = list.map(function (it, i) {
-      return '<div class="vrow" data-i="' + i + '">' +
+    const list = all.slice().sort(function (x, y) {
+      const fx = isFocus(x) ? 0 : 1, fy = isFocus(y) ? 0 : 1;
+      if (fx !== fy) return fx - fy;
+      const hx = x.hits || 1, hy = y.hits || 1;
+      if (hx !== hy) return hy - hx;
+      return (y.at || 0) - (x.at || 0);
+    });
+
+    box.innerHTML = list.map(function (it) {
+      const hits = it.hits || 1;
+      const on = isFocus(it);
+      return '<div class="vrow" data-word="' + esc(it.word) + '">' +
         '<input type="checkbox" checked>' +
         '<div class="vmain">' +
           '<div><span class="vword">' + esc(it.word) + "</span>" +
           (it.ipa ? '<span class="vipa">' + esc(it.ipa) + "</span>" : "") +
           (it.pos ? '<span class="vpos">' + esc(it.pos) + "</span>" : "") +
-          (it.src ? '<span class="vsrc">选自' + esc(it.src) + "</span>" : "") + "</div>" +
+          (it.src ? '<span class="vsrc">选自' + esc(it.src) + "</span>" : "") +
+          (hits > 1 ? '<span class="vhits">查过 ' + hits + " 次</span>" : "") +
+          (isFocus(it) && !it.star ? '<span class="vfocus">重点</span>' : "") +
+          "</div>" +
           (it.meaning ? '<div class="vmean">' + esc(it.meaning) + "</div>" : "") +
           (it.nuance ? '<div class="vnu">' + esc(it.nuance) + "</div>" : "") +
           (it.sentence ? '<div class="vex">' + esc(it.sentence) + "</div>" : "") +
           (it.sentenceZh ? '<div class="vzh">' + esc(it.sentenceZh) + "</div>" : "") +
         "</div>" +
+        '<button class="vstar' + (it.star ? " on" : "") + '" title="' + (it.star ? "取消标记" : "手动标记为重点") + '">' + (it.star ? "★" : "☆") + "</button>" +
         '<button class="vdel" title="删除">×</button></div>';
     }).join("");
-    Array.from(box.querySelectorAll(".vdel")).forEach(function (b) {
-      b.addEventListener("click", function () {
-        const row = b.closest(".vrow");
-        const it = list[Number(row.dataset.i)];
-        vocabRemove(it.word);
+
+    Array.from(box.querySelectorAll(".vrow")).forEach(function (row) {
+      const word = row.dataset.word;
+      row.querySelector(".vstar").addEventListener("click", function () {
+        const arr = vocabAll();
+        const i = arr.findIndex(function (x) { return String(x.word).toLowerCase() === String(word).toLowerCase(); });
+        if (i < 0) return;
+        arr[i].star = !arr[i].star;
+        vocabSave(arr);
         renderVocab();
+        refreshWordMarks();
+      });
+      row.querySelector(".vdel").addEventListener("click", function () {
+        vocabRemove(word);
+        renderVocab();
+        refreshWordMarks();
       });
     });
   }
@@ -518,7 +586,8 @@
     const rows = items.map(function (it) {
       return '<div class="item"><div class="hd"><b>' + esc(it.word) + "</b>" +
         (it.ipa ? '<span class="ipa">' + esc(it.ipa) + "</span>" : "") +
-        (it.pos ? '<span class="pos">' + esc(it.pos) + "</span>" : "") + "</div>" +
+        (it.pos ? '<span class="pos">' + esc(it.pos) + "</span>" : "") +
+        (it.hits > 1 ? '<span class="hits">查过 ' + it.hits + " 次</span>" : "") + "</div>" +
         (it.meaning ? '<div class="mn">' + esc(it.meaning) + "</div>" : "") +
         (it.nuance ? '<div class="nu">' + esc(it.nuance) + "</div>" : "") +
         (it.sentence ? '<div class="ex">' + esc(it.sentence) + "</div>" : "") +
@@ -535,6 +604,7 @@
       ".mn{font-size:12pt;margin-top:1mm}.nu{color:#777;font-size:10pt}" +
       ".ex{font-family:Georgia,serif;font-style:italic;color:#555;font-size:10pt;margin-top:1mm}" +
       ".exz{color:#666;font-size:10pt}" +
+      ".hits{color:#b3352b;font-size:9pt;border:1px solid #f0cfc9;border-radius:3px;padding:0 1.5mm;margin-left:2mm}" +
       "</style></head><body><h1>六级生词本</h1><div class='sub'>共 " + items.length + " 条 · " +
       new Date().toLocaleDateString("zh-CN") + "</div>" + rows + "</body></html>";
 
@@ -1248,14 +1318,15 @@
   envCheck();
   setInterval(envCheck, 20000);
   if (/[?&]cfg=1/.test(location.search)) $("#ovSettings").classList.add("show");
-  if (/[?&]vocabdemo=1/.test(location.search)) {
+  if (/[?&]vocabdemo=(1|seed)/.test(location.search)) {
     if (!vocabAll().length) {
       vocabAdd({ word: "influencer", ipa: "/ˈɪnfluənsə/", pos: "n.", meaning: "网红；有影响力的人", nuance: "指靠社媒内容变现、拥有大量粉丝的人", sentence: "Influencers have large followings.", sentenceZh: "网红拥有大量粉丝。", src: "文章" });
       vocabAdd({ word: "sealed off", ipa: "", pos: "短语", meaning: "被封锁的；与外界隔绝的", nuance: "此处指名气与奢侈品曾是小圈子的特权", sentence: "influencers rose by making fame and luxury less 'sealed off'.", sentenceZh: "网红通过让名气与奢侈不再封闭而崛起。", src: "文章" });
       vocabAdd({ word: "vehement", ipa: "/ˈviːəmənt/", pos: "adj.", meaning: "激烈的；猛烈的", nuance: "修饰 critic，指批评得毫不留情", sentence: "A vehement one is Symeon Brown.", sentenceZh: "其中一位言辞激烈的批评者是西米恩·布朗。", src: "题目" });
+      vocabAdd({ word: "vehement", ipa: "/ˈviːəmənt/", pos: "adj.", meaning: "激烈的；猛烈的", nuance: "修饰 critic，指批评得毫不留情", sentence: "A vehement critic attacked the industry.", sentenceZh: "一位言辞激烈的批评者抨击了这个行业。", src: "文章" });
     }
     renderVocab();
-    $("#ovVocab").classList.add("show");
+    if (!/[?&]vocabdemo=seed/.test(location.search)) $("#ovVocab").classList.add("show");
   }
   if (/[?&]historydemo=1/.test(location.search)) setTimeout(openHistory, 400);
   if (/[?&]dictdemo=1/.test(location.search)) setTimeout(function () {
