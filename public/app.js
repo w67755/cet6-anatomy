@@ -121,6 +121,39 @@
     renderThumbs();
   }
 
+  function resetWorkbench() {
+    els.article.value = "";
+    updateWc();
+    state.images = [];
+    renderThumbs();
+    els.qlist.innerHTML = "";
+    qSeq = 0;
+    state.kind = "mcq";
+    const ksel = $("#qkind"); if (ksel) ksel.value = "mcq";
+    addQuestion();
+    const ma = $("#myAns"); if (ma) ma.value = "";
+    state.analysis = ""; state.chat = [];
+    state.recordId = null; state.recordTitle = "";
+    updateRecChip("");
+    const res = $("#result");
+    if (res) res.innerHTML = '<div class="empty">把文章和题目填好，点左边「开始解剖」。<br>报告会包含：文章骨架 → 逐题定位 → 你的错选出自哪一句 → 共性诊断 → 生词。</div>';
+    if (els.msgs) els.msgs.innerHTML = "";
+    setReading("");
+    const banner = $("#mixedWarn"); if (banner) banner.hidden = true;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function newSession() {
+    const hasText = els.article.value.trim().length > 0;
+    const hasQs = collect().some(function (q) { return q.stem; });
+    if ((hasText || hasQs || state.images.length) &&
+        !(await confirmBox("开始新的一篇", "会清空当前的文章、题目和照片；已经存进错题本的内容不受影响。"))) {
+      return;
+    }
+    resetWorkbench();
+    toast("已清空，可以传新的一份了");
+  }
+
   function mixedCheck() {
     const banner = $("#mixedWarn");
     if (!banner) return;
@@ -1864,6 +1897,7 @@
     if (!(await confirmBox("删除选中的记录", "将删除 " + ids.length + " 条记录，无法恢复。"))) return;
     await deleteRecords(ids);
   });
+  $("#btnNew").addEventListener("click", newSession);
   $("#btnSplit").addEventListener("click", doSplit);
   $("#splitClose").addEventListener("click", function () { $("#ovSplit").classList.remove("show"); });
   $("#splitSave").addEventListener("click", saveSplit);
@@ -2046,6 +2080,7 @@
     renderVocab();
     if (!/[?&]vocabdemo=seed/.test(location.search)) $("#ovVocab").classList.add("show");
   }
+  if (/[?&]resetdemo=1/.test(location.search)) setTimeout(function () { resetWorkbench(); }, 1500);
   if (/[?&]afterimg=1/.test(location.search)) setTimeout(function () {
     const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
     state.images = [{ name: "new-page.jpg", dataUrl: png, w: 1, h: 1, kb: 1 }];
