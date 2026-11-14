@@ -588,6 +588,32 @@ const server = http.createServer(async (req, res) => {
     return res.end(buf);
   }
 
+  if (u.pathname === "/api/backup" && req.method === "GET") {
+    const records = readJson(F_RECORDS, []);
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    return res.end(JSON.stringify({ kind: "cet6-anatomy-backup", version: 1, exportedAt: Date.now(), records }));
+  }
+
+  if (u.pathname === "/api/backup/import" && req.method === "POST") {
+    const b = await body(req);
+    const incoming = Array.isArray(b.records) ? b.records : [];
+    const list = readJson(F_RECORDS, []);
+    const have = new Set(list.map((r) => r.id));
+    let added = 0;
+    for (const r of incoming) {
+      if (!r || !r.id || have.has(r.id)) continue;
+      list.unshift({
+        id: r.id, title: r.title || "未命名", article: r.article || "", questions: r.questions || [],
+        analysis: r.analysis || "", chat: r.chat || [], createdAt: r.createdAt || Date.now(), updatedAt: Date.now(),
+      });
+      have.add(r.id);
+      added++;
+    }
+    writeJson(F_RECORDS, list.slice(0, 500));
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    return res.end(JSON.stringify({ added, total: list.length }));
+  }
+
   if (u.pathname === "/api/find" && req.method === "GET") {
     const w = String(u.searchParams.get("word") || "").trim().toLowerCase();
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
