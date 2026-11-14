@@ -295,12 +295,15 @@
         <input type="file" id="imgInput" accept="image/*" multiple hidden>
       </div>
       <div class="thumbs" id="thumbs"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn sm" id="btnSplit" style="flex:1;justify-content:center">整卷分割 · 一次传整套，自动切成多篇</button>
+      </div>
+      <div class="hint" style="margin-top:6px">拍了一整套卷子（多页）就用这个；只做一篇的话，直接点「开始解剖」。</div>
       <div class="or">没有照片？直接贴文字也行</div>
       <textarea id="article" spellcheck="false" placeholder="把阅读原文粘贴到这里（也可上传 .txt）。段落之间留空行，定位会更准。"></textarea>
       <div class="row">
         <label class="btn ghost sm">上传 txt<input type="file" id="file" accept=".txt,.md" hidden></label>
         <button class="btn ghost sm" id="clearArticle">清空文字</button>
-        <button class="btn sm" id="btnSplit">整卷分割…</button>
       </div>
     </div>
 
