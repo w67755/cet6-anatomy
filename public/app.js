@@ -430,6 +430,8 @@
       } else {
         vocabTouch(hit.word || word);
       }
+      wordEl.classList.add("w-known");
+      if (isFocus(vocabIndex()[String(hit.word || word).toLowerCase()] || {})) wordEl.classList.add("w-focus");
       return renderDict(el, word, hit);
     }
     wordEl.classList.add("loading");
@@ -439,6 +441,8 @@
       data.sentence = sentence;
       cacheSet(key, data);
       vocabAdd({ word: data.word || word, ipa: data.ipa, pos: data.pos, meaning: data.meaning, nuance: data.nuance, sentence: sentence, sentenceZh: data.sentenceZh, src: src || "" });
+      wordEl.classList.add("w-known");
+      if (isFocus(vocabIndex()[String(data.word || word).toLowerCase()] || {})) wordEl.classList.add("w-focus");
       renderDict(el, word, data);
     } catch (e) {
       el.innerHTML = '<button class="close">×</button><div class="dw">' + esc(word) + "</div>" +
@@ -644,6 +648,19 @@
       return;
     }
     box.dataset.open = "1";
+    // 先看当前阅读区里有没有这个词，有就直接跳，不必去翻记录
+    const here = document.querySelector("#reading .w");
+    if (here) {
+      const local = Array.from(document.querySelectorAll("#reading .w")).find(function (el) {
+        return stemKey(el.textContent) === stemKey(word) || String(el.textContent).toLowerCase() === String(word).toLowerCase();
+      });
+      if (local) {
+        $("#ovVocab").classList.remove("show");
+        flashWord(local);
+        toast("已在当前文章里定位到「" + word + "」");
+        return;
+      }
+    }
     box.innerHTML = '<div class="vlink hint">查找中…</div>';
     let list = [];
     try {
@@ -656,7 +673,7 @@
       return;
     }
     if (!list || !list.length) {
-      box.innerHTML = '<div class="vlink err">找不到这篇文章：可能已经被删除，或者这个词是示例数据。</div>';
+      box.innerHTML = '<div class="vlink err">没找到包含这个词的文章——它可能还没存进错题本，或者那篇文章已经被删了。</div>';
       return;
     }
     if (list.length === 1) return gotoRecord(list[0].id, word);
