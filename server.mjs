@@ -149,6 +149,16 @@ const MATCH_PROMPT = [
   "表格：词/短语 | 释义 | 原文搭配",
 ].join("\n");
 
+const CLOZE_SYSTEM = [
+  "你是英语学习材料的编写者。学生会给你一组单词，你要为每个单词写一句用于「挖空练习」的例句。",
+  "要求：",
+  "1. 每句 12–20 词，难度贴近六级，句子本身要有上下文线索，能让人猜出该词的意思。",
+  "2. 必须自然地包含该单词（可用其变形），不要用其他生僻词。",
+  "3. 句子里不要出现中文，不要解释单词本身。",
+  "4. 只输出 JSON，不要解释、不要代码块围栏：",
+  '{"items":[{"word":"promote","sentence":"Many brands pay influencers to promote their products to younger audiences."}]}',
+].join("\n");
+
 function questionBlock(qs) {
   return (qs || []).map((q, i) => {
     const no = q.no || i + 1;
@@ -550,6 +560,61 @@ const server = http.createServer(async (req, res) => {
       return reply({ passages: list });
     } catch (e) {
       return reply({ error: "分割失败：" + String((e && e.message) || e) }, 502);
+    }
+  }
+
+  if (u.pathname === "/api/cloze" && req.method === "POST") {
+    const b = await body(req);
+    const cfg = getSettings();
+    const reply = (obj, code) => {
+      res.writeHead(code || 200, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify(obj));
+    };
+    const words = (Array.isArray(b.words) ? b.words : []).slice(0, 40)
+      .map((w) => ({ word: String(w.word || "").trim(), meaning: String(w.meaning || "").trim() }))
+      .filter((w) => w.word);
+    if (!words.length) return reply({ error: "没有可用的生词" }, 400);
+    if (!cfg.apiKey) return reply({ error: "生成例句需要 API Key" }, 400);
+
+    const base = String(cfg.baseUrl || "").replace(/\/+$/, "");
+    const list = words.map((w) => "- " + w.word + (w.meaning ? "（" + w.meaning + "）" : "")).join("\n");
+    try {
+      const r = await fetch(base + "/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.apiKey },
+        body: JSON.stringify({
+          model: cfg.model || "deepseek-flash",
+          messages: [
+            { role: "system", content: CLOZE_SYSTEM },
+            { role: "user", content: "单词表：\n" + list },
+          ],
+          thinking: { type: "disabled" },
+          response_format: { type: "json_object" },
+          temperature: 0.6,
+          max_tokens: 3000,
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        return reply({ error: "上游返回 " + r.status + "：" + t.slice(0, 200) }, 502);
+      }
+      const j = await r.json();
+      const raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || "";
+      const cleaned = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+      let data = null;
+      try { data = JSON.parse(cleaned); } catch {
+        const m = cleaned.match(/\{[\s\S]*\}/);
+        if (m) { try { data = JSON.parse(m[0]); } catch {} }
+      }
+      const items = (data && Array.isArray(data.items) ? data.items : [])
+        .map((x) => ({ word: String(x.word || ""), sentence: String(x.sentence || "").trim() }))
+        .filter((x) => x.word && x.sentence);
+      if (!items.length) return reply({ error: "例句解析失败" }, 502);
+      return reply({ items });
+    } catch (e) {
+      return reply({ error: "生成失败：" + String((e && e.message) || e) }, 502);
     }
   }
 
