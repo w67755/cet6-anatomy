@@ -842,36 +842,36 @@
     return a;
   }
 
-  function buildWordItems(list, n) {
-    const pool = shuffle(list.filter(function (x) { return x.meaning; })).slice(0, n);
+  function blankWord(sentence, word) {
+    const esc = String(word).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    let re;
+    try { re = new RegExp("(^|[^A-Za-z])(" + esc + ")([A-Za-z]*)", "i"); } catch (e) { return null; }
+    const m = re.exec(sentence);
+    if (!m) return null;
+    const start = m.index + m[1].length;
+    const len = m[2].length + m[3].length;
+    return {
+      text: sentence.slice(0, start) + "________" + sentence.slice(start + len),
+      matched: sentence.substr(start, len),
+    };
+  }
+
+  function buildClozeItems(pool, aiMap) {
     return pool.map(function (it) {
-      const others = shuffle(list.filter(function (x) {
-        return x.meaning && String(x.word).toLowerCase() !== String(it.word).toLowerCase();
-      }));
-      const distract = [];
-      for (let k = 0; k < others.length && distract.length < 3; k++) {
-        if (others[k].meaning && others[k].meaning !== it.meaning) distract.push(others[k].meaning);
-      }
-      const useEn = Math.random() < 0.55;
-      let prompt, sub, correct, options;
-      if (useEn) {
-        prompt = it.word; sub = [it.ipa, it.pos].filter(Boolean).join("   ");
-        correct = it.meaning;
-        options = shuffle([correct].concat(distract));
-      } else {
-        prompt = it.meaning; sub = "";
-        correct = it.word;
-        options = shuffle([correct].concat(others.slice(0, 3).map(function (o) { return o.word; })));
-      }
-      return {
+      const ai = aiMap && aiMap[String(it.word).toLowerCase()];
+      const sent = String(ai || it.sentence || "").trim();
+      const b = sent ? blankWord(sent, it.word) : null;
+      const base = {
         word: it.word,
-        type: useEn ? "en2zh" : "zh2en",
-        prompt: prompt, sub: sub,
-        options: options.map(function (t) { return { t: t, ok: t === correct }; }),
-        note: it.nuance || "",
-        sentence: it.sentence || "",
-        sentenceZh: it.sentenceZh || "",
+        ipa: it.ipa || "",
+        pos: it.pos || "",
+        meaning: it.meaning || "",
+        nuance: it.nuance || "",
       };
+      if (b) {
+        return Object.assign({ kind: "cloze", text: b.text, sentenceZh: ai ? "" : (it.sentenceZh || "") }, base);
+      }
+      return Object.assign({ kind: "word", sentenceZh: it.sentenceZh || "" }, base);
     });
   }
 
@@ -903,6 +903,13 @@
       ".score{font-size:44px;font-weight:700;color:#1c4f82;margin:6px 0}",
       ".wrong-item{border-top:1px dashed #e6e2d9;padding:10px 0;font-size:14px}",
       ".wrong-item b{font-family:Georgia,serif}",
+      ".cloze{font-family:Georgia,serif;font-size:19px;line-height:1.9;margin:8px 0 4px}",
+      ".back{margin-top:16px;padding-top:14px;border-top:1px dashed #e6e2d9;display:none}",
+      ".back.show{display:block}",
+      ".answord{font-family:Georgia,serif;font-size:21px;font-weight:700;color:#1c4f82}",
+      ".dm{font-size:16px;margin-top:6px;font-weight:600}",
+      ".dn{color:#6b7280;font-size:13.5px;margin-top:4px}",
+      ".ds{color:#6b7280;font-size:13.5px;margin-top:8px}",
       ".passage{font-family:Georgia,'Times New Roman',serif;font-size:17.5px;line-height:1.85}",
       ".passage p{margin:0 0 12px}",
       ".hl{background:#fff1cc;border-bottom:2px solid #e0b64a;padding:0 2px;border-radius:3px;cursor:pointer}",
@@ -924,12 +931,11 @@
       "function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }",
       "function tips(txt){ var t=document.getElementById('tip'); t.textContent=txt; t.className='tip show'; clearTimeout(tips._t); tips._t=setTimeout(function(){t.className='tip';},2200); }",
       "function done(){",
-      "  var pct = Math.round(score / Math.max(1, D.items.length) * 100);",
-      "  var rows = wrong.map(function(w){ return '<div class=\"wrong-item\"><b>'+esc(w.prompt)+'</b> → '+esc(w.answer)+'<br><span class=\"ex\">'+esc(w.sentence||'')+'</span></div>'; }).join('');",
       "  var code = 'CET6Q1|' + wrongW.join(';') + '|' + rightW.join(';');",
+      "  var rows = wrong.map(function(w){ return '<div class=\"wrong-item\"><b>'+esc(w.prompt)+'</b> → '+esc(w.answer)+'</div>'; }).join('');",
       "  app.innerHTML = '<div class=\"card\"><div class=\"qno\">完成</div><div class=\"score\">'+score+' / '+D.items.length+'</div>'",
-      "    + '<div class=\"sub\">正确率 '+pct+'%'+(wrong.length?' · 错 '+wrong.length+' 题':' · 全对')+'</div>'",
-      "    + (rows ? '<h2>再错一次</h2>'+rows : '')",
+      "    + '<div class=\"sub\">记住了 '+score+' 个'+(wrong.length?' · 没记住 '+wrong.length+' 个':' · 全对')+'</div>'",
+      "    + (rows ? '<h2>再记一遍</h2>'+rows : '')",
       "    + '<h2>结果码</h2><p class=\"sub\" style=\"margin:0 0 8px\">复制这段，回到「错题解剖台」的生词本，点「导入练习结果」</p>'",
       "    + '<textarea readonly id=\"rc\" style=\"width:100%;min-height:70px;font-family:ui-monospace,Consolas,monospace;font-size:12px;border:1px solid #e6e2d9;border-radius:10px;padding:10px;background:#fdfcf9\">'+code+'</textarea>'",
       "    + '<div class=\"nav\"><button class=\"btn p\" id=\"copyrc\">复制结果码</button><button class=\"btn\" id=\"again\">再来一轮</button></div></div>';",
@@ -939,39 +945,27 @@
       "function render(){",
       "  if (i >= D.items.length) return done();",
       "  var it = D.items[i];",
-      "  var opts = it.options.map(function(o,k){ return '<button class=\"opt\" data-k=\"'+k+'\">'+esc(o.t)+'</button>'; }).join('');",
+      "  var front = it.kind === 'cloze'",
+      "    ? '<div class=\"cloze\">' + esc(it.text) + '</div>' + '<div class=\"sub2\">这句话里，空格处是什么意思？</div>'",
+      "    : '<div class=\"prompt\">' + esc(it.word) + '</div><div class=\"sub2\">' + esc(it.ipa||'') + ' ' + esc(it.pos||'') + '</div>';",
       "  app.innerHTML = '<div class=\"card\"><div class=\"qno\">第 '+(i+1)+' / '+D.items.length+' 题</div>'",
-      "    + '<div class=\"prompt'+(it.type==='zh2en'?' zh':'')+'\">'+esc(it.prompt)+'</div>'",
-      "    + (it.sub ? '<div class=\"sub2\">'+esc(it.sub)+'</div>' : '')",
-      "    + '<div class=\"opts\">'+opts+'</div>'",
-      "    + '<div class=\"fb\" id=\"fb\"></div></div>';",
-      "  Array.prototype.forEach.call(app.querySelectorAll('.opt'), function(btn){",
-      "    btn.onclick = function(){",
-      "      var k = Number(btn.dataset.k);",
-      "      var ok = it.options[k].ok;",
-      "      Array.prototype.forEach.call(app.querySelectorAll('.opt'), function(b, idx){",
-      "        b.disabled = true;",
-      "        if (it.options[idx].ok) b.classList.add('ok');",
-      "        else if (idx === k) b.classList.add('no');",
-      "        else b.classList.add('dim');",
-      "      });",
-      "      var fb = document.getElementById('fb');",
-      "      if (ok) { score++; rightW.push(it.word); fb.innerHTML = '<div class=\"line\">✅ 对了'+(it.note?' · '+esc(it.note):'')+'</div>'; }",
-      "      else {",
-      "        var right = it.options.filter(function(o){return o.ok;})[0];",
-      "        wrongW.push(it.word);",
-      "        wrong.push({prompt: it.prompt, answer: right.t, sentence: it.sentence});",
-      "        fb.innerHTML = '<div class=\"line\">❌ 正确答案：<b>'+esc(right.t)+'</b>'+(it.note?' · '+esc(it.note):'')+'</div>'",
-      "          + (it.sentence ? '<div class=\"line ex\">'+esc(it.sentence)+'<br>'+esc(it.sentenceZh||'')+'</div>' : '');",
-      "      }",
-      "      fb.classList.add('show');",
-      "      var nav = document.createElement('div');",
-      "      nav.className = 'nav';",
-      "      nav.innerHTML = '<button class=\"btn p\" id=\"next\">'+(i+1>=D.items.length?'看结果':'下一题')+'</button>';",
-      "      app.querySelector('.card').appendChild(nav);",
-      "      document.getElementById('next').onclick = function(){ i++; render(); };",
-      "    };",
-      "  });",
+      "    + front",
+      "    + '<div class=\"nav\"><button class=\"btn p\" id=\"reveal\">' + (it.kind==='cloze' ? '看答案' : '看释义') + '</button></div>'",
+      "    + '<div class=\"back\" id=\"back\"></div></div>';",
+      "  document.getElementById('reveal').onclick = function(){ showBack(it); };",
+      "}",
+      "function showBack(it){",
+      "  var back = document.getElementById('back');",
+      "  back.innerHTML = '<div class=\"answord\">'+esc(it.word)+'</div>'",
+      "    + '<div class=\"ipa\">'+esc(it.ipa||'')+(it.pos?' · '+esc(it.pos):'')+'</div>'",
+      "    + '<div class=\"dm\">'+esc(it.meaning)+'</div>'",
+      "    + (it.nuance?'<div class=\"dn\">'+esc(it.nuance)+'</div>':'')",
+      "    + (it.sentenceZh?'<div class=\"ds\">'+esc(it.sentenceZh)+'</div>':'')",
+      "    + '<div class=\"nav\"><button class=\"btn\" id=\"bad\">没记住</button><button class=\"btn p\" id=\"good\">记住了</button></div>';",
+      "  back.className = 'back show';",
+      "  document.getElementById('reveal').style.display = 'none';",
+      "  document.getElementById('good').onclick = function(){ score++; rightW.push(it.word); i++; render(); };",
+      "  document.getElementById('bad').onclick = function(){ wrongW.push(it.word); wrong.push({prompt: it.word, answer: it.meaning}); i++; render(); };",
       "}",
       "function renderPassage(){",
       "  var map = {};",
@@ -1133,8 +1127,23 @@
         qErr("至少要有 4 个生词才能出选择题（现在 " + words.length + " 个）。");
         return null;
       }
-      const items = buildWordItems(words, n);
-      return { mode: "words", title: "六级生词自测", sub: "共 " + items.length + " 题 · " + dateStr() + " · 点选项作答", items: items };
+      const pick = shuffle(words).slice(0, n);
+      const btn0 = $("#qGo"), pv0 = $("#qPreview");
+      btn0.disabled = true; pv0.disabled = true;
+      const old0 = btn0.textContent;
+      btn0.textContent = "生成例句…"; pv0.textContent = "生成例句…";
+      let aiMap = {};
+      try {
+        const r = await api("/api/cloze", { words: pick.map(function (w) { return { word: w.word, meaning: w.meaning }; }) });
+        (r.items || []).forEach(function (x) { aiMap[String(x.word).toLowerCase()] = x.sentence; });
+      } catch (e) {
+        /* 没有 Key 或生成失败：退回生词本里已有的例句，甚至纯词义卡 */
+      } finally {
+        btn0.disabled = false; pv0.disabled = false;
+        btn0.textContent = old0; pv0.textContent = "先预览";
+      }
+      const items = buildClozeItems(pick, aiMap);
+      return { mode: "words", title: "六级生词挖空", sub: "共 " + items.length + " 题 · " + dateStr() + " · 先想意思，再看答案", items: items };
     }
     if (words.length < 3) {
       qErr("至少要有 3 个生词。");
@@ -2166,8 +2175,8 @@
     const words = vocabAll().filter(function (w) { return w.word && w.meaning; });
     let data;
     if (mode === "preview") {
-      const items = buildWordItems(words, 15);
-      $("#quizFrame").srcdoc = quizPageHtml({ mode: "words", title: "六级生词自测", sub: "共 " + items.length + " 题 · demo", items: items });
+      const items = buildClozeItems(shuffle(words).slice(0, 15), null);
+      $("#quizFrame").srcdoc = quizPageHtml({ mode: "words", title: "六级生词挖空", sub: "共 " + items.length + " 题 · demo", items: items });
       $("#ovPreview").classList.add("show");
       return;
     }
@@ -2181,8 +2190,8 @@
         return;
       }
     } else {
-      const items = buildWordItems(words, 15);
-      data = { mode: "words", title: "六级生词自测", sub: "共 " + items.length + " 题 · demo · 点选项作答", items: items };
+      const items = buildClozeItems(shuffle(words).slice(0, 15), null);
+      data = { mode: "words", title: "六级生词挖空", sub: "共 " + items.length + " 题 · demo", items: items };
     }
     const html = quizPageHtml(data);
     const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
