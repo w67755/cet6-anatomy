@@ -154,9 +154,9 @@ const CLOZE_SYSTEM = [
   "要求：",
   "1. 每句 12–20 词，难度贴近六级，句子本身要有上下文线索，能让人猜出该词的意思。",
   "2. 必须自然地包含该单词（可用其变形），不要用其他生僻词。",
-  "3. 句子里不要出现中文，不要解释单词本身。",
+  "3. 句子本身不要出现中文；但每条要额外给一句通顺的中文翻译。",
   "4. 只输出 JSON，不要解释、不要代码块围栏：",
-  '{"items":[{"word":"promote","sentence":"Many brands pay influencers to promote their products to younger audiences."}]}',
+  '{"items":[{"word":"promote","sentence":"Many brands pay influencers to promote their products to younger audiences.","sentenceZh":"许多品牌付费给网红，让他们向年轻受众推销自己的产品。"}]}',
 ].join("\n");
 
 function questionBlock(qs) {
@@ -609,7 +609,11 @@ const server = http.createServer(async (req, res) => {
         if (m) { try { data = JSON.parse(m[0]); } catch {} }
       }
       const items = (data && Array.isArray(data.items) ? data.items : [])
-        .map((x) => ({ word: String(x.word || ""), sentence: String(x.sentence || "").trim() }))
+        .map((x) => ({
+          word: String(x.word || ""),
+          sentence: String(x.sentence || "").trim(),
+          sentenceZh: String(x.sentenceZh || x.zh || "").trim(),
+        }))
         .filter((x) => x.word && x.sentence);
       if (!items.length) return reply({ error: "例句解析失败" }, 502);
       return reply({ items });

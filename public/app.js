@@ -859,8 +859,8 @@
 
   function buildClozeItems(pool, aiMap) {
     return pool.map(function (it) {
-      const ai = aiMap && aiMap[String(it.word).toLowerCase()];
-      const sent = String(ai || it.sentence || "").trim();
+      const ent = aiMap && aiMap[String(it.word).toLowerCase()];
+      const sent = String((ent && ent.s) || it.sentence || "").trim();
       const b = sent ? markWord(sent, it.word) : null;
       const base = {
         word: it.word,
@@ -870,7 +870,8 @@
         nuance: it.nuance || "",
       };
       if (b) {
-        return Object.assign({ kind: "cloze", before: b.before, hit: b.hit, after: b.after, sentenceZh: ai ? "" : (it.sentenceZh || "") }, base);
+        const zh = (ent && ent.zh) || it.sentenceZh || "";
+        return Object.assign({ kind: "cloze", before: b.before, hit: b.hit, after: b.after, sentenceZh: zh }, base);
       }
       return Object.assign({ kind: "word", sentenceZh: it.sentenceZh || "" }, base);
     });
@@ -962,7 +963,7 @@
       "    + '<div class=\"ipa\">'+esc(it.ipa||'')+(it.pos?' · '+esc(it.pos):'')+'</div>'",
       "    + '<div class=\"dm\">'+esc(it.meaning)+'</div>'",
       "    + (it.nuance?'<div class=\"dn\">'+esc(it.nuance)+'</div>':'')",
-      "    + (it.sentenceZh?'<div class=\"ds\">'+esc(it.sentenceZh)+'</div>':'')",
+      "    + (it.sentenceZh?'<div class=\"ds\"><b>译文：</b>'+esc(it.sentenceZh)+'</div>':'')",
       "    + '<div class=\"nav\"><button class=\"btn\" id=\"bad\">没记住</button><button class=\"btn p\" id=\"good\">记住了</button></div>';",
       "  back.className = 'back show';",
       "  document.getElementById('reveal').style.display = 'none';",
@@ -1137,7 +1138,9 @@
       let aiMap = {};
       try {
         const r = await api("/api/cloze", { words: pick.map(function (w) { return { word: w.word, meaning: w.meaning }; }) });
-        (r.items || []).forEach(function (x) { aiMap[String(x.word).toLowerCase()] = x.sentence; });
+        (r.items || []).forEach(function (x) {
+          aiMap[String(x.word).toLowerCase()] = { s: x.sentence, zh: x.sentenceZh || "" };
+        });
       } catch (e) {
         /* 没有 Key 或生成失败：退回生词本里已有的例句，甚至纯词义卡 */
       } finally {
