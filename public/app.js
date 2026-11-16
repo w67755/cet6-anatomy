@@ -588,6 +588,19 @@
     return n;
   }
 
+  function vQuery() {
+    const el = $("#vSearch");
+    return el ? String(el.value || "").trim().toLowerCase() : "";
+  }
+
+  function hl(text, q) {
+    const s = String(text || "");
+    if (!q) return esc(s);
+    const i = s.toLowerCase().indexOf(q);
+    if (i < 0) return esc(s);
+    return esc(s.slice(0, i)) + '<span class="vhit">' + esc(s.slice(i, i + q.length)) + "</span>" + esc(s.slice(i + q.length));
+  }
+
   function renderVocab() {
     const all = vocabAll();
     vocabSave(all);
@@ -601,7 +614,18 @@
       box.innerHTML = '<div class="vempty">生词本还是空的。去「⑤ 原文精读」里点几个词，查过的词会自动收进来。</div>';
       return;
     }
-    const list = all.slice().sort(function (x, y) {
+    const q = vQuery();
+    const matched = q ? all.filter(function (x) {
+      return (x.word || "").toLowerCase().indexOf(q) >= 0 ||
+        (x.meaning || "").toLowerCase().indexOf(q) >= 0 ||
+        (x.nuance || "").toLowerCase().indexOf(q) >= 0 ||
+        (x.sentence || "").toLowerCase().indexOf(q) >= 0;
+    }) : all;
+    if (!matched.length) {
+      box.innerHTML = '<div class="vempty">没有匹配「' + esc(q) + '」的词。<br>试试只输前几个字母，或者搜中文释义。</div>';
+      return;
+    }
+    const list = matched.slice().sort(function (x, y) {
       const fx = isFocus(x) ? 0 : 1, fy = isFocus(y) ? 0 : 1;
       if (fx !== fy) return fx - fy;
       const hx = x.hits || 1, hy = y.hits || 1;
@@ -615,7 +639,7 @@
       return '<div class="vrow" data-word="' + esc(it.word) + '">' +
         '<input type="checkbox" checked>' +
         '<div class="vmain">' +
-          '<div><span class="vword">' + esc(it.word) + "</span>" +
+          '<div><span class="vword">' + hl(it.word, q) + "</span>" +
           (it.ipa ? '<span class="vipa">' + esc(it.ipa) + "</span>" : "") +
           (it.pos ? '<span class="vpos">' + esc(it.pos) + "</span>" : "") +
           (it.src ? '<span class="vsrc">选自' + esc(it.src) + "</span>" : "") +
@@ -623,7 +647,7 @@
           (isFocus(it) && !it.star ? '<span class="vfocus">重点</span>' : "") +
           (isDue(it) ? '<span class="vbadge">待复习</span>' : "") +
           "</div>" +
-          (it.meaning ? '<div class="vmean">' + esc(it.meaning) + "</div>" : "") +
+          (it.meaning ? '<div class="vmean">' + hl(it.meaning, q) + "</div>" : "") +
           (it.nuance ? '<div class="vnu">' + esc(it.nuance) + "</div>" : "") +
           (it.sentence ? '<div class="vex">' + esc(it.sentence) + "</div>" : "") +
           (it.sentenceZh ? '<div class="vzh">' + esc(it.sentenceZh) + "</div>" : "") +
@@ -2050,6 +2074,10 @@
 
   $("#btnVocab").addEventListener("click", function () { renderVocab(); $("#ovVocab").classList.add("show"); });
   $("#closeVocab").addEventListener("click", function () { $("#ovVocab").classList.remove("show"); });
+  $("#vSearch").addEventListener("input", function () { renderVocab(); });
+  $("#vSearch").addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { e.target.value = ""; renderVocab(); }
+  });
   $("#vAll").addEventListener("click", function () {
     Array.from(document.querySelectorAll("#vList input[type=checkbox]")).forEach(function (c) { c.checked = true; });
   });
@@ -2201,6 +2229,11 @@
     } catch (e) {
       document.body.insertAdjacentHTML("beforeend", "<pre style='padding:20px;color:#b3352b'>" + e.message + "</pre>");
     }
+  }, 700);
+  if (/[?&]vq=/.test(location.search)) setTimeout(function () {
+    const q = decodeURIComponent((location.search.match(/[?&]vq=([^&]+)/) || [])[1] || "");
+    const el = $("#vSearch");
+    if (el) { el.value = q; renderVocab(); }
   }, 700);
   if (/[?&]resultdemo=1/.test(location.search)) setTimeout(function () {
     if (!vocabAll().length) seedDemoVocab();
