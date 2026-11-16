@@ -842,17 +842,18 @@
     return a;
   }
 
-  function blankWord(sentence, word) {
-    const esc = String(word).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  function markWord(sentence, word) {
+    const pattern = String(word).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
     let re;
-    try { re = new RegExp("(^|[^A-Za-z])(" + esc + ")([A-Za-z]*)", "i"); } catch (e) { return null; }
+    try { re = new RegExp("(^|[^A-Za-z])(" + pattern + ")([A-Za-z]*)", "i"); } catch (e) { return null; }
     const m = re.exec(sentence);
     if (!m) return null;
     const start = m.index + m[1].length;
     const len = m[2].length + m[3].length;
     return {
-      text: sentence.slice(0, start) + "________" + sentence.slice(start + len),
-      matched: sentence.substr(start, len),
+      before: sentence.slice(0, start),
+      hit: sentence.substr(start, len),
+      after: sentence.slice(start + len),
     };
   }
 
@@ -860,7 +861,7 @@
     return pool.map(function (it) {
       const ai = aiMap && aiMap[String(it.word).toLowerCase()];
       const sent = String(ai || it.sentence || "").trim();
-      const b = sent ? blankWord(sent, it.word) : null;
+      const b = sent ? markWord(sent, it.word) : null;
       const base = {
         word: it.word,
         ipa: it.ipa || "",
@@ -869,7 +870,7 @@
         nuance: it.nuance || "",
       };
       if (b) {
-        return Object.assign({ kind: "cloze", text: b.text, sentenceZh: ai ? "" : (it.sentenceZh || "") }, base);
+        return Object.assign({ kind: "cloze", before: b.before, hit: b.hit, after: b.after, sentenceZh: ai ? "" : (it.sentenceZh || "") }, base);
       }
       return Object.assign({ kind: "word", sentenceZh: it.sentenceZh || "" }, base);
     });
@@ -904,6 +905,7 @@
       ".wrong-item{border-top:1px dashed #e6e2d9;padding:10px 0;font-size:14px}",
       ".wrong-item b{font-family:Georgia,serif}",
       ".cloze{font-family:Georgia,serif;font-size:19px;line-height:1.9;margin:8px 0 4px}",
+      ".cloze .hit{color:#1c4f82;border-bottom:2px solid #e0b64a;padding-bottom:1px}",
       ".back{margin-top:16px;padding-top:14px;border-top:1px dashed #e6e2d9;display:none}",
       ".back.show{display:block}",
       ".answord{font-family:Georgia,serif;font-size:21px;font-weight:700;color:#1c4f82}",
@@ -946,7 +948,7 @@
       "  if (i >= D.items.length) return done();",
       "  var it = D.items[i];",
       "  var front = it.kind === 'cloze'",
-      "    ? '<div class=\"cloze\">' + esc(it.text) + '</div>' + '<div class=\"sub2\">这句话里，空格处是什么意思？</div>'",
+      "    ? '<div class=\"cloze\">' + esc(it.before) + '<b class=\"hit\">' + esc(it.hit) + '</b>' + esc(it.after) + '</div>' + '<div class=\"sub2\">根据上下文，这个词在这里是什么意思？</div>'",
       "    : '<div class=\"prompt\">' + esc(it.word) + '</div><div class=\"sub2\">' + esc(it.ipa||'') + ' ' + esc(it.pos||'') + '</div>';",
       "  app.innerHTML = '<div class=\"card\"><div class=\"qno\">第 '+(i+1)+' / '+D.items.length+' 题</div>'",
       "    + front",
@@ -1143,7 +1145,7 @@
         btn0.textContent = old0; pv0.textContent = "先预览";
       }
       const items = buildClozeItems(pick, aiMap);
-      return { mode: "words", title: "六级生词挖空", sub: "共 " + items.length + " 题 · " + dateStr() + " · 先想意思，再看答案", items: items };
+      return { mode: "words", title: "六级生词猜义", sub: "共 " + items.length + " 题 · " + dateStr() + " · 先猜意思，再看答案", items: items };
     }
     if (words.length < 3) {
       qErr("至少要有 3 个生词。");
@@ -2176,7 +2178,7 @@
     let data;
     if (mode === "preview") {
       const items = buildClozeItems(shuffle(words).slice(0, 15), null);
-      $("#quizFrame").srcdoc = quizPageHtml({ mode: "words", title: "六级生词挖空", sub: "共 " + items.length + " 题 · demo", items: items });
+      $("#quizFrame").srcdoc = quizPageHtml({ mode: "words", title: "六级生词猜义", sub: "共 " + items.length + " 题 · demo", items: items });
       $("#ovPreview").classList.add("show");
       return;
     }
@@ -2191,7 +2193,7 @@
       }
     } else {
       const items = buildClozeItems(shuffle(words).slice(0, 15), null);
-      data = { mode: "words", title: "六级生词挖空", sub: "共 " + items.length + " 题 · demo", items: items };
+      data = { mode: "words", title: "六级生词猜义", sub: "共 " + items.length + " 题 · demo", items: items };
     }
     const html = quizPageHtml(data);
     const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
