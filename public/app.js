@@ -519,9 +519,26 @@
     return map;
   }
 
+  function formMatch(a, b) {
+    const x = String(a || "").toLowerCase();
+    const y = String(b || "").toLowerCase();
+    if (!x || !y) return false;
+    const sx = stemKey(x), sy = stemKey(y);
+    if (x === y || sx === sy || sx + "e" === sy || sy + "e" === sx) return true;
+    if (x.length >= 4 && y.indexOf(x) === 0 && y.length - x.length <= 3) return true;
+    if (y.length >= 4 && x.indexOf(y) === 0 && x.length - y.length <= 3) return true;
+    return false;
+  }
+
   function vocabLookup(map, token) {
     const t = String(token || "").toLowerCase();
-    return map[t] || map[stemKey(t)] || null;
+    const direct = map[t] || map[stemKey(t)];
+    if (direct) return direct;
+    const keys = Object.keys(map);
+    for (let i = 0; i < keys.length; i++) {
+      if (formMatch(keys[i], t)) return map[keys[i]];
+    }
+    return null;
   }
 
   function vocabTouch(word) {
@@ -711,7 +728,7 @@
     const key = stemKey(word);
     const same = function (x) {
       const t = String(x.textContent).toLowerCase();
-      return t === key || stemKey(t) === key || t === String(word).toLowerCase();
+      return t === key || stemKey(t) === key || formMatch(t, word);
     };
 
     // 1) 记录里那句原句如果还能找到，就定位到那一句所在段落
