@@ -859,9 +859,14 @@
 
   function vocabSelected() {
     const list = vocabAll();
-    const rows = Array.from(document.querySelectorAll("#vList .vrow"));
-    return rows.filter(function (r) { return r.querySelector("input[type=checkbox]").checked; })
-      .map(function (r) { return list[Number(r.dataset.i)]; }).filter(Boolean);
+    const names = Array.from(document.querySelectorAll("#vList .vrow"))
+      .filter(function (r) {
+        const c = r.querySelector("input[type=checkbox]");
+        return c && c.checked;
+      })
+      .map(function (r) { return String(r.dataset.word || "").toLowerCase(); })
+      .filter(Boolean);
+    return list.filter(function (x) { return names.indexOf(String(x.word).toLowerCase()) >= 0; });
   }
 
   function confirmBox(title, text) {
