@@ -530,7 +530,13 @@ D) The influencer industry has grown to about $250 billion by now."></textarea>
     </div>
     <div class="field">
       <label>范围</label>
-      <select id="qscope"><option value="all">全部生词</option><option value="due" id="qdDue">今天该复习的</option><option value="focus">只要重点词（★ 或查过 ≥2 次）</option></select>
+      <select id="qscope">
+        <option value="priority">按优先级自动挑（推荐）</option>
+        <option value="due" id="qdDue">只要今天到期的</option>
+        <option value="focus">只要重点词（★ 或查过 ≥2 次）</option>
+        <option value="all">全部生词里随机</option>
+      </select>
+      <div class="tip" id="qscopeTip">自动挑：查过次数多、久没复习、还没掌握的词排在前面；做完练习答对的词，下次优先级会自动降低。</div>
     </div>
     <div class="cfgerr" id="qErr"></div>
     <div class="foot">

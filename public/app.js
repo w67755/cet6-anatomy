@@ -1239,12 +1239,35 @@
     const d = new Date();
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
+  function priorityOf(it, now) {
+    const hits = Math.min(it.hits || 1, 6);
+    const box = it.box || 0;
+    const overdue = Math.max(0, ((now || Date.now()) - dueOf(it)) / 86400000);
+    let s = hits * (6 - box) * 2;
+    s += Math.min(overdue, 60) * 3;
+    if (it.star) s += 20;
+    if (!it.last) s += 10;
+    return s;
+  }
+
+  function pickByPriority(list, n) {
+    const now = Date.now();
+    return list.slice()
+      .sort(function (x, y) { return priorityOf(y, now) - priorityOf(x, now); })
+      .slice(0, n);
+  }
+
   function quizWords(scope) {
     const all = vocabAll();
     let list = all;
     if (scope === "focus") list = all.filter(isFocus);
     else if (scope === "due") list = dueList();
     return list.filter(function (x) { return x.word && x.meaning; });
+  }
+
+  function pickWords(words, n, scope) {
+    if (scope === "all") return shuffle(words).slice(0, n);
+    return pickByPriority(words, n);
   }
   function downloadQuiz(data) {
     const blob = new Blob([quizPageHtml(data)], { type: "text/html;charset=utf-8" });
@@ -1268,7 +1291,7 @@
         qErr("至少要有 4 个生词才能出选择题（现在 " + words.length + " 个）。");
         return null;
       }
-      const pick = shuffle(words).slice(0, n);
+      const pick = pickWords(words, n, $("#qscope").value);
       const btn0 = $("#qGo"), pv0 = $("#qPreview");
       btn0.disabled = true; pv0.disabled = true;
       const old0 = btn0.textContent;
@@ -1292,7 +1315,7 @@
       qErr("至少要有 3 个生词。");
       return null;
     }
-    const pick = shuffle(words).slice(0, 8);
+    const pick = pickWords(words, 8, $("#qscope").value);
     const btn = $("#qGo"), pv = $("#qPreview");
     btn.disabled = true; pv.disabled = true;
     const old = btn.textContent;
