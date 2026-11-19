@@ -471,12 +471,27 @@
     } catch (e) { /* ignore */ }
     return [];
   }
+  let vocabPushTimer = null;
+  let vocabDeleted = [];
+  function pushVocab(list) {
+    clearTimeout(vocabPushTimer);
+    vocabPushTimer = setTimeout(function () {
+      const payload = { items: list, deleted: vocabDeleted.slice() };
+      fetch("/api/vocab", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).then(function () { vocabDeleted = []; }).catch(function () {});
+    }, 600);
+  }
+
   function vocabSave(list) {
     try {
       const cur = localStorage.getItem("vocab");
       if (cur && cur !== "[]") localStorage.setItem("vocab:bak", cur);
       localStorage.setItem("vocab", JSON.stringify(list));
     } catch (e) {}
+    pushVocab(list);
     const n = $("#vocabN");
     if (n) n.textContent = list.length;
   }
@@ -524,6 +539,51 @@
     return w;
   }
 
+  async function hydrateVocab() {
+    let remote = [];
+    try {
+      const r = await api("/api/vocab");
+      remote = Array.isArray(r.items) ? r.items : [];
+    } catch (e) { return; }
+    const local = vocabAll();
+    if (!remote.length && !local.length) return;
+
+    const map = {};
+    local.forEach(function (x) { if (x && x.word) map[String(x.word).toLowerCase()] = x; });
+    let changed = false;
+    remote.forEach(function (x) {
+      if (!x || !x.word) return;
+      const k = String(x.word).toLowerCase();
+      const cur = map[k];
+      if (!cur) { map[k] = x; changed = true; return; }
+      map[k] = {
+        word: cur.word || x.word,
+        ipa: cur.ipa || x.ipa || "",
+        pos: cur.pos || x.pos || "",
+        meaning: cur.meaning || x.meaning || "",
+        nuance: cur.nuance || x.nuance || "",
+        sentence: cur.sentence || x.sentence || "",
+        sentenceZh: cur.sentenceZh || x.sentenceZh || "",
+        src: cur.src || x.src || "",
+        hits: Math.max(cur.hits || 1, x.hits || 1),
+        star: !!(cur.star || x.star),
+        box: Math.max(cur.box || 0, x.box || 0),
+        due: Math.min(cur.due || Date.now(), x.due || Date.now()),
+        last: Math.max(cur.last || 0, x.last || 0),
+        at: Math.min(cur.at || Date.now(), x.at || Date.now()),
+      };
+    });
+    const merged = Object.keys(map).map(function (k) { return map[k]; });
+    if (changed || merged.length !== local.length) {
+      try { localStorage.setItem("vocab", JSON.stringify(merged)); } catch (e) {}
+    }
+    if (merged.length) pushVocab(merged);
+    const nEl = $("#vocabN");
+    if (nEl) nEl.textContent = merged.length;
+    renderVocab();
+    refreshWordMarks();
+  }
+
   function vocabIndex() {
     const map = {};
     vocabAll().forEach(function (x) {
@@ -562,6 +622,7 @@
     if (i >= 0) { list[i].at = Date.now(); vocabSave(list); }
   }
   function vocabRemove(word) {
+    vocabDeleted.push(String(word).toLowerCase());
     vocabSave(vocabAll().filter(function (x) { return String(x.word).toLowerCase() !== String(word).toLowerCase(); }));
   }
 
@@ -2103,12 +2164,14 @@
     if (!sel.length) return toast("先勾选要删除的词");
     if (!(await confirmBox("删除选中的词", "将删除 " + sel.length + " 个词，删掉就没了。"))) return;
     const names = sel.map(function (x) { return String(x.word).toLowerCase(); });
+    names.forEach(function (n) { vocabDeleted.push(n); });
     vocabSave(vocabAll().filter(function (x) { return names.indexOf(String(x.word).toLowerCase()) < 0; }));
     renderVocab();
     toast("已删除 " + sel.length + " 个");
   });
   $("#vClear").addEventListener("click", async function () {
     if (!(await confirmBox("清空生词本", "会删掉全部 " + vocabAll().length + " 条记录，确定？"))) return;
+    vocabAll().forEach(function (x) { vocabDeleted.push(String(x.word).toLowerCase()); });
     vocabSave([]);
     renderVocab();
   });
@@ -2205,6 +2268,9 @@
         "。生词本按「地址+端口」隔离——如果你之前在 :7788 里记过词，请回到 http://127.0.0.1:7788 查看。";
     }
   })();
+  const n0 = $("#vocabN");
+  if (n0) n0.textContent = vocabAll().length;
+  hydrateVocab();
   loadSettings();
   envCheck();
   setInterval(envCheck, 20000);
@@ -2220,7 +2286,7 @@
   }
 
   if (/[?&]vocabdemo=(1|seed)/.test(location.search)) {
-    if (!vocabAll().length) seedDemoVocab();
+    if (!vocabAll().length && !/[?&]noseed=1/.test(location.search)) seedDemoVocab();
     renderVocab();
     if (!/[?&]vocabdemo=seed/.test(location.search)) $("#ovVocab").classList.add("show");
   }

@@ -14,6 +14,7 @@ const BUILD = "2026-11-14-vocab";
 const HOST = "127.0.0.1";
 const F_SETTINGS = path.join(DATA, "settings.json");
 const F_RECORDS = path.join(DATA, "records.json");
+const F_VOCAB = path.join(DATA, "vocab.json");
 const DEFAULT_SETTINGS = { baseUrl: "https://api.deepseek.com/v1", apiKey: "", model: "deepseek-flash", temperature: 0.2 };
 
 const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return d; } };
@@ -779,6 +780,43 @@ const server = http.createServer(async (req, res) => {
       "Content-Length": buf.length,
     });
     return res.end(buf);
+  }
+
+  if (u.pathname === "/api/vocab") {
+    const list = readJson(F_VOCAB, []);
+    if (req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify({ items: Array.isArray(list) ? list : [] }));
+    }
+    if (req.method === "POST") {
+      const b = await body(req);
+      const items = Array.isArray(b.items) ? b.items.slice(0, 5000) : [];
+      const deleted = Array.isArray(b.deleted) ? b.deleted.map((w) => String(w).toLowerCase()) : [];
+      const map = {};
+      (Array.isArray(list) ? list : []).forEach((x) => {
+        if (x && x.word) map[String(x.word).toLowerCase()] = x;
+      });
+      items.forEach((x) => {
+        if (!x || !x.word) return;
+        const k = String(x.word).toLowerCase();
+        const cur = map[k];
+        if (!cur) { map[k] = x; return; }
+        map[k] = {
+          ...cur, ...x,
+          hits: Math.max(cur.hits || 1, x.hits || 1),
+          box: Math.max(cur.box || 0, x.box || 0),
+          star: !!(cur.star || x.star),
+          due: Math.min(cur.due || Date.now(), x.due || Date.now()),
+          last: Math.max(cur.last || 0, x.last || 0),
+          at: Math.min(cur.at || Date.now(), x.at || Date.now()),
+        };
+      });
+      deleted.forEach((k) => { delete map[k]; });
+      const merged = Object.keys(map).map((k) => map[k]);
+      writeJson(F_VOCAB, merged);
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify({ ok: true, count: merged.length }));
+    }
   }
 
   if (u.pathname === "/api/backup" && req.method === "GET") {
