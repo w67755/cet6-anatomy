@@ -458,10 +458,25 @@
 
   /* ---------------- 生词本 ---------------- */
   function vocabAll() {
-    try { return JSON.parse(localStorage.getItem("vocab") || "[]"); } catch (e) { return []; }
+    try {
+      const v = JSON.parse(localStorage.getItem("vocab") || "[]");
+      if (Array.isArray(v)) return v;
+    } catch (e) { /* 落到备份 */ }
+    try {
+      const bak = JSON.parse(localStorage.getItem("vocab:bak") || "[]");
+      if (Array.isArray(bak) && bak.length) {
+        localStorage.setItem("vocab", JSON.stringify(bak));
+        return bak;
+      }
+    } catch (e) { /* ignore */ }
+    return [];
   }
   function vocabSave(list) {
-    try { localStorage.setItem("vocab", JSON.stringify(list)); } catch (e) {}
+    try {
+      const cur = localStorage.getItem("vocab");
+      if (cur && cur !== "[]") localStorage.setItem("vocab:bak", cur);
+      localStorage.setItem("vocab", JSON.stringify(list));
+    } catch (e) {}
     const n = $("#vocabN");
     if (n) n.textContent = list.length;
   }
@@ -603,7 +618,6 @@
 
   function renderVocab() {
     const all = vocabAll();
-    vocabSave(all);
     const dueN = all.filter(function (x) { return x.word && isDue(x); }).length;
     const dueEl = $("#vDue");
     if (dueEl) dueEl.textContent = dueN ? "今天该复习 " + dueN + " 个。" : "";
@@ -2181,7 +2195,16 @@
 
   addQuestion();
   updateWc();
-  vocabSave(vocabAll());
+  (function originHint() {
+    const b = $("#envWarn");
+    if (!b || location.protocol === "file:") return;
+    const port = location.port || "";
+    if (port && port !== "7788" && vocabAll().length === 0) {
+      b.hidden = false;
+      b.innerHTML = "当前打开的是 127.0.0.1:" + port +
+        "。生词本按「地址+端口」隔离——如果你之前在 :7788 里记过词，请回到 http://127.0.0.1:7788 查看。";
+    }
+  })();
   loadSettings();
   envCheck();
   setInterval(envCheck, 20000);
