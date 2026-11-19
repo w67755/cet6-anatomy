@@ -350,6 +350,7 @@ function buildDocx(items, title) {
     if (it.ipa) head += wRun("  " + it.ipa, { size: 18, color: "777777", face: "Georgia" });
     if (it.pos) head += wRun("  " + it.pos, { size: 18, color: "1C4F82" });
     if (it.hits && it.hits > 1) head += wRun("  查过 " + it.hits + " 次", { size: 16, color: "B3352B" });
+    if (it.miss) head += wRun("  练错 " + it.miss + " 次", { size: 16, color: "B3352B" });
     body.push(wPara(head, { before: 220, after: 40 }));
     if (it.meaning) body.push(wPara(wRun(it.meaning, { size: 24 }), { after: 30 }));
     if (it.nuance) body.push(wPara(wRun(it.nuance, { size: 18, color: "666666" }), { after: 30 }));
@@ -804,6 +805,7 @@ const server = http.createServer(async (req, res) => {
         map[k] = {
           ...cur, ...x,
           hits: Math.max(cur.hits || 1, x.hits || 1),
+          miss: Math.max(cur.miss || 0, x.miss || 0),
           box: Math.max(cur.box || 0, x.box || 0),
           star: !!(cur.star || x.star),
           due: Math.min(cur.due || Date.now(), x.due || Date.now()),

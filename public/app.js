@@ -566,6 +566,7 @@
         sentenceZh: cur.sentenceZh || x.sentenceZh || "",
         src: cur.src || x.src || "",
         hits: Math.max(cur.hits || 1, x.hits || 1),
+        miss: Math.max(cur.miss || 0, x.miss || 0),
         star: !!(cur.star || x.star),
         box: Math.max(cur.box || 0, x.box || 0),
         due: Math.min(cur.due || Date.now(), x.due || Date.now()),
@@ -646,7 +647,7 @@
     res.wrong.forEach(function (w) {
       const i = idx(w);
       if (i < 0) return;
-      list[i].hits = (list[i].hits || 1) + 1;
+      list[i].miss = (list[i].miss || 0) + 1;
       list[i].box = 0;
       list[i].last = now;
       list[i].due = now + DAY * INTERVAL[0];
@@ -719,6 +720,7 @@
           (it.pos ? '<span class="vpos">' + esc(it.pos) + "</span>" : "") +
           (it.src ? '<span class="vsrc">选自' + esc(it.src) + "</span>" : "") +
           (hits > 1 ? '<span class="vhits">查过 ' + hits + " 次</span>" : "") +
+          (it.miss ? '<span class="vmiss">错 ' + it.miss + " 次</span>" : "") +
           (isFocus(it) && !it.star ? '<span class="vfocus">重点</span>' : "") +
           (isDue(it) ? '<span class="vbadge">待复习</span>' : "") +
           "</div>" +
@@ -937,7 +939,8 @@
       return '<div class="item"><div class="hd"><b>' + esc(it.word) + "</b>" +
         (it.ipa ? '<span class="ipa">' + esc(it.ipa) + "</span>" : "") +
         (it.pos ? '<span class="pos">' + esc(it.pos) + "</span>" : "") +
-        (it.hits > 1 ? '<span class="hits">查过 ' + it.hits + " 次</span>" : "") + "</div>" +
+        (it.hits > 1 ? '<span class="hits">查过 ' + it.hits + " 次</span>" : "") +
+        (it.miss ? '<span class="hits">练错 ' + it.miss + " 次</span>" : "") + "</div>" +
         (it.meaning ? '<div class="mn">' + esc(it.meaning) + "</div>" : "") +
         (it.nuance ? '<div class="nu">' + esc(it.nuance) + "</div>" : "") +
         (it.sentence ? '<div class="ex">' + esc(it.sentence) + "</div>" : "") +
@@ -1245,6 +1248,7 @@
     const overdue = Math.max(0, ((now || Date.now()) - dueOf(it)) / 86400000);
     let s = hits * (6 - box) * 2;
     s += Math.min(overdue, 60) * 3;
+    s += Math.min(it.miss || 0, 6) * 5;
     if (it.star) s += 20;
     if (!it.last) s += 10;
     return s;
@@ -1929,6 +1933,7 @@
         sentence: cur.sentence || x.sentence, sentenceZh: cur.sentenceZh || x.sentenceZh,
         src: cur.src || x.src,
         hits: Math.max(cur.hits || 1, x.hits || 1),
+        miss: Math.max(cur.miss || 0, x.miss || 0),
         star: !!(cur.star || x.star),
         box: Math.max(cur.box || 0, x.box || 0),
         due: Math.min(cur.due || Date.now(), x.due || Date.now()),
